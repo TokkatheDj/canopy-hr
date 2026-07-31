@@ -2,7 +2,7 @@
 
 **A full-featured HR platform** — people records, hiring, onboarding, time off, timesheets, payroll, benefits, performance, surveys, and reporting — built as a complete, working demonstration of a modern HRIS.
 
-> **Live demo:** _deployment pending — see [DEPLOYMENT.md](DEPLOYMENT.md)_
+> **Live demo:** https://canopy-hr.vercel.app
 > **Demo company:** Meridian Coffee Co. — 57 seeded employees with 18 months of history.
 
 ## Try it — demo accounts
