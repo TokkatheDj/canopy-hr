@@ -22,6 +22,12 @@ export default async function MyInfoPage() {
   const emp = await db.employee.findUniqueOrThrow({
     where: { id: user.employeeId },
   });
+  const stubs = await db.payStub.findMany({
+    where: { employeeId: user.employeeId, run: { status: "PAID" } },
+    include: { run: true },
+    orderBy: { run: { payDate: "desc" } },
+    take: 8,
+  });
   const pending = await db.approvalRequest.findMany({
     where: {
       requesterId: user.employeeId,
@@ -73,6 +79,39 @@ export default async function MyInfoPage() {
                 </div>
               );
             })}
+          </CardContent>
+        </Card>
+      )}
+
+      {stubs.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>My pay stubs</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            {stubs.map((s) => (
+              <Link
+                key={s.id}
+                href={`/payroll/stubs/${s.id}`}
+                className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition hover:border-emerald-500"
+              >
+                <span>
+                  {s.run.payDate.toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                    timeZone: "UTC",
+                  })}
+                </span>
+                <span className="font-medium">
+                  {(s.netCents / 100).toLocaleString("en-US", {
+                    style: "currency",
+                    currency: "USD",
+                  })}{" "}
+                  <span className="font-normal text-muted-foreground">net</span>
+                </span>
+              </Link>
+            ))}
           </CardContent>
         </Card>
       )}

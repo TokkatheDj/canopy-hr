@@ -559,8 +559,122 @@ async function main() {
     }
   }
 
-  // ── pay schedule (runs generated in later phase) ──
+  // ── pay schedule ──
   await db.paySchedule.create({ data: { name: "Semi-Monthly", frequency: "SEMI_MONTHLY" } });
+
+  // ── benefit plans + enrollments (deductions feed the payroll sim) ──
+  const medical = await db.benefitPlan.create({
+    data: {
+      name: "Cascade Medical PPO", type: "MEDICAL", provider: "Cascade Health",
+      description: "PPO with nationwide network, $1,000 deductible.",
+      tiers: [
+        { tier: "Employee Only", employeeCostCentsPerPayPeriod: 9500 },
+        { tier: "Employee + Spouse", employeeCostCentsPerPayPeriod: 19800 },
+        { tier: "Family", employeeCostCentsPerPayPeriod: 27400 },
+      ],
+    },
+  });
+  const dental = await db.benefitPlan.create({
+    data: {
+      name: "Brightsmile Dental", type: "DENTAL", provider: "Brightsmile",
+      description: "Two cleanings a year covered in full, 50% major services.",
+      tiers: [
+        { tier: "Employee Only", employeeCostCentsPerPayPeriod: 1400 },
+        { tier: "Employee + Spouse", employeeCostCentsPerPayPeriod: 2900 },
+        { tier: "Family", employeeCostCentsPerPayPeriod: 4100 },
+      ],
+    },
+  });
+  const vision = await db.benefitPlan.create({
+    data: {
+      name: "Clearview Vision", type: "VISION", provider: "Clearview",
+      description: "Annual exam plus $150 frames/contacts allowance.",
+      tiers: [
+        { tier: "Employee Only", employeeCostCentsPerPayPeriod: 600 },
+        { tier: "Employee + Spouse", employeeCostCentsPerPayPeriod: 1100 },
+        { tier: "Family", employeeCostCentsPerPayPeriod: 1600 },
+      ],
+    },
+  });
+  const k401 = await db.benefitPlan.create({
+    data: {
+      name: "Meridian 401(k)", type: "RETIREMENT", provider: "Summit Retirement",
+      description: "Pre-tax retirement savings; company matches 50% up to 6%.",
+      tiers: [],
+    },
+  });
+  await db.enrollmentWindow.create({
+    data: {
+      name: `Open Enrollment ${YEAR}`,
+      startDate: daysAgo(3),
+      endDate: daysFromNow(11),
+    },
+  });
+  const tierNames = ["Employee Only", "Employee Only", "Employee + Spouse", "Family"];
+  for (const emp of activeEmployees) {
+    if (!faker.datatype.boolean({ probability: 0.85 })) continue; // some opted out
+    const tier = faker.helpers.arrayElement(tierNames);
+    await db.benefitEnrollment.create({
+      data: { employeeId: emp.id, planId: medical.id, tier },
+    });
+    if (faker.datatype.boolean({ probability: 0.7 })) {
+      await db.benefitEnrollment.create({
+        data: { employeeId: emp.id, planId: dental.id, tier },
+      });
+    }
+    if (faker.datatype.boolean({ probability: 0.5 })) {
+      await db.benefitEnrollment.create({
+        data: { employeeId: emp.id, planId: vision.id, tier },
+      });
+    }
+    if (faker.datatype.boolean({ probability: 0.6 })) {
+      await db.benefitEnrollment.create({
+        data: {
+          employeeId: emp.id, planId: k401.id,
+          electionPct: faker.helpers.arrayElement([3, 4, 5, 6, 8, 10]),
+        },
+      });
+    }
+  }
+
+  // ── timesheets for hourly employees: current period, APPROVED ──
+  const hourlyComps = await db.compensation.findMany({
+    where: { payType: "HOURLY" },
+    select: { employeeId: true },
+    distinct: ["employeeId"],
+  });
+  const hourlyIds = new Set(hourlyComps.map((c) => c.employeeId));
+  const hourlyActive = activeEmployees.filter((e) => hourlyIds.has(e.id));
+  // current semi-monthly period
+  const periodStart = NOW.getDate() <= 15
+    ? new Date(Date.UTC(NOW.getFullYear(), NOW.getMonth(), 1))
+    : new Date(Date.UTC(NOW.getFullYear(), NOW.getMonth(), 16));
+  const periodEnd = NOW.getDate() <= 15
+    ? new Date(Date.UTC(NOW.getFullYear(), NOW.getMonth(), 15))
+    : new Date(Date.UTC(NOW.getFullYear(), NOW.getMonth() + 1, 0));
+  for (const emp of hourlyActive) {
+    const period = await db.timesheetPeriod.create({
+      data: {
+        employeeId: emp.id, periodStart, periodEnd, status: "APPROVED",
+      },
+    });
+    // workdays in period so far
+    const cursor = new Date(periodStart);
+    const stop = NOW < periodEnd ? NOW : periodEnd;
+    while (cursor <= stop) {
+      const dow = cursor.getUTCDay();
+      if (dow !== 0 && dow !== 6 && faker.datatype.boolean({ probability: 0.92 })) {
+        await db.timesheetEntry.create({
+          data: {
+            periodId: period.id,
+            date: new Date(cursor),
+            hours: faker.helpers.arrayElement([6, 7, 7.5, 8, 8, 8, 8.5, 9, 10]),
+          },
+        });
+      }
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+  }
 
   const counts = await db.employee.count();
   console.log(`Done. ${counts} employees seeded.`);

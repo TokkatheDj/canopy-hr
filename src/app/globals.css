@@ -128,3 +128,15 @@
     @apply font-sans;
   }
 }
+/* Print: show only main content (pay stubs, offer letters) */
+@media print {
+  aside,
+  header,
+  nav,
+  [data-slot="button"] {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+}
