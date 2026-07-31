@@ -85,7 +85,7 @@ export function ApplyForm({ openingId }: { openingId: string }) {
             <Button
               type="submit"
               disabled={busy}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="bg-emerald-700 hover:bg-emerald-800 text-white"
             >
               {busy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
               Submit application

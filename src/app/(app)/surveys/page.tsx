@@ -83,7 +83,7 @@ export default async function SurveysPage() {
                 <div className="flex items-center gap-2">
                   <Badge
                     variant={c.status === "OPEN" ? "default" : "outline"}
-                    className={c.status === "OPEN" ? "bg-emerald-600 text-white" : undefined}
+                    className={c.status === "OPEN" ? "bg-emerald-700 text-white" : undefined}
                   >
                     {c.status.toLowerCase()}
                   </Badge>

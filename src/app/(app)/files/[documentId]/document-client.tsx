@@ -50,7 +50,7 @@ export function SignBlock({
           </div>
           <Button
             disabled={busy || name.trim().length < 2}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            className="bg-emerald-700 hover:bg-emerald-800 text-white"
             onClick={async () => {
               setBusy(true);
               const res = await signDocument(requestId, name);

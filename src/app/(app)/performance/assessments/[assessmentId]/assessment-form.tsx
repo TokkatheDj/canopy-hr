@@ -106,7 +106,7 @@ export function AssessmentForm({
             Save draft
           </Button>
           <Button
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            className="bg-emerald-700 hover:bg-emerald-800 text-white"
             disabled={busy !== null || !complete}
             onClick={() => persist(true)}
           >

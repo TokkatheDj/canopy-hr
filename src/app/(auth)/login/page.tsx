@@ -58,7 +58,7 @@ function LoginInner() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white dark:from-emerald-950 dark:to-neutral-950 flex items-center justify-center p-4">
+    <main className="min-h-screen bg-gradient-to-b from-emerald-50 to-white dark:from-emerald-950 dark:to-neutral-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
@@ -138,7 +138,7 @@ function LoginInner() {
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button
             type="submit"
-            className="w-full bg-emerald-600 hover:bg-emerald-700"
+            className="w-full bg-emerald-700 hover:bg-emerald-800"
             disabled={busy !== null}
           >
             {busy === "form" ? <Loader2 className="size-4 animate-spin" /> : "Sign in"}
@@ -150,7 +150,7 @@ function LoginInner() {
           commercial HR product.
         </p>
       </div>
-    </div>
+    </main>
   );
 }
 

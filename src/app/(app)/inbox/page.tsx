@@ -60,7 +60,7 @@ export default async function InboxPage() {
           <CardTitle>
             Needs your approval{" "}
             {mine.length > 0 && (
-              <Badge className="ml-1 bg-emerald-600 text-white">{mine.length}</Badge>
+              <Badge className="ml-1 bg-emerald-700 text-white">{mine.length}</Badge>
             )}
           </CardTitle>
         </CardHeader>

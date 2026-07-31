@@ -114,7 +114,7 @@ export default async function ReportsPage() {
           </p>
         </div>
         <Button
-          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          className="bg-emerald-700 hover:bg-emerald-800 text-white"
           nativeButton={false}
           render={<Link href="/reports/builder" />}
         >

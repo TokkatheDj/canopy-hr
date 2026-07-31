@@ -306,7 +306,7 @@ export default async function PerformancePage() {
                     <Badge
                       variant={c.status === "OPEN" ? "default" : "outline"}
                       className={
-                        c.status === "OPEN" ? "bg-emerald-600 text-white" : undefined
+                        c.status === "OPEN" ? "bg-emerald-700 text-white" : undefined
                       }
                     >
                       {c.status.toLowerCase()}

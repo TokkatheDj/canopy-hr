@@ -67,7 +67,7 @@ export function SurveyRespondCard({
               className={cn(
                 "size-9 rounded-md border text-sm font-medium transition",
                 score === i
-                  ? "border-emerald-600 bg-emerald-600 text-white"
+                  ? "border-emerald-600 bg-emerald-700 text-white"
                   : "hover:border-emerald-400",
               )}
             >
@@ -82,7 +82,7 @@ export function SurveyRespondCard({
           className="min-h-[70px]"
         />
         <Button
-          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          className="bg-emerald-700 hover:bg-emerald-800 text-white"
           disabled={busy || score === null}
           onClick={async () => {
             if (score === null) return;
@@ -213,7 +213,7 @@ export function NewSurveyDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+          <Button className="bg-emerald-700 hover:bg-emerald-800 text-white">
             <Plus className="size-4" /> New survey
           </Button>
         }

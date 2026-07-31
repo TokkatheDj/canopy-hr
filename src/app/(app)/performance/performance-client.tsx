@@ -337,7 +337,7 @@ export function NewCycleDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+          <Button className="bg-emerald-700 hover:bg-emerald-800 text-white">
             <Plus className="size-4" /> Start review cycle
           </Button>
         }

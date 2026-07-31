@@ -52,7 +52,7 @@ export function AppTopbar({
         >
           <Bell className="size-5" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-semibold text-white">
+            <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-emerald-700 text-[10px] font-semibold text-white">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}

@@ -80,7 +80,7 @@ export function ClockButtons({
     </Button>
   ) : (
     <Button
-      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+      className="bg-emerald-700 hover:bg-emerald-800 text-white"
       disabled={busy}
       onClick={() => run(clockIn, "Clocked in — have a good shift!")}
     >
@@ -184,7 +184,7 @@ export function SubmitPeriodButton({ periodId }: { periodId: string }) {
   return (
     <Button
       size="sm"
-      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+      className="bg-emerald-700 hover:bg-emerald-800 text-white"
       disabled={busy}
       onClick={() => run(() => submitPeriod(periodId), "Timesheet submitted for approval")}
     >

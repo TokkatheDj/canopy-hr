@@ -86,7 +86,7 @@ export default async function CandidatePage({
           </p>
         </div>
         {candidate.hiredEmployeeId ? (
-          <Badge className="bg-emerald-600 text-white">
+          <Badge className="bg-emerald-700 text-white">
             <BadgeCheck className="size-3.5" /> hired
           </Badge>
         ) : candidate.rejectedAt ? (
