@@ -373,6 +373,97 @@ async function main() {
     }
   }
 
+  // ── in-flight time off: who's out today, upcoming, and pending approvals ──
+  const jordanReports = await db.employee.findMany({
+    where: { managerId: mgrDemo.id, status: "ACTIVE", id: { not: empDemo.id } },
+    take: 3,
+  });
+  const otherActive = await db.employee.findMany({
+    where: {
+      status: "ACTIVE",
+      managerId: { notIn: [mgrDemo.id], not: null },
+      id: { notIn: [adminEmp.id, mgrDemo.id, empDemo.id] },
+    },
+    include: { manager: true },
+    take: 8,
+  });
+
+  function daysFromNow(n: number): Date {
+    const d = new Date(NOW);
+    d.setDate(d.getDate() + n);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  async function seedApprovedTimeOff(
+    empId: string, policyId: string, start: Date, end: Date, days: number,
+  ) {
+    const totalHours = days * 8;
+    const req = await db.timeOffRequest.create({
+      data: {
+        employeeId: empId, policyId, startDate: start, endDate: end,
+        hoursPerDay: 8, totalHours, status: "APPROVED",
+      },
+    });
+    await db.timeOffLedgerEntry.create({
+      data: {
+        employeeId: empId, policyId, date: start, amountHours: -totalHours,
+        kind: "USAGE", note: "Approved time off", periodKey: `usage-${req.id}`,
+      },
+    });
+  }
+
+  // 3 people out today
+  await seedApprovedTimeOff(otherActive[0].id, vacation.id, daysFromNow(-2), daysFromNow(2), 5);
+  await seedApprovedTimeOff(otherActive[1].id, sick.id, daysFromNow(0), daysFromNow(1), 2);
+  await seedApprovedTimeOff(jordanReports[0].id, vacation.id, daysFromNow(-1), daysFromNow(0), 2);
+  // upcoming approved (calendar depth)
+  await seedApprovedTimeOff(otherActive[2].id, vacation.id, daysFromNow(6), daysFromNow(10), 5);
+  await seedApprovedTimeOff(otherActive[3].id, personal.id, daysFromNow(12), daysFromNow(12), 1);
+  await seedApprovedTimeOff(otherActive[4].id, vacation.id, daysFromNow(20), daysFromNow(24), 5);
+
+  // pending requests routed through the approval chain (demo Manager + Admin see these)
+  async function seedPendingTimeOff(
+    emp: { id: string; firstName: string; lastName: string; managerId: string | null },
+    policyId: string, policyName: string, start: Date, end: Date, days: number,
+  ) {
+    const totalHours = days * 8;
+    const req = await db.timeOffRequest.create({
+      data: {
+        employeeId: emp.id, policyId, startDate: start, endDate: end,
+        hoursPerDay: 8, totalHours, status: "PENDING",
+      },
+    });
+    const mgr = emp.managerId
+      ? await db.employee.findUnique({ where: { id: emp.managerId } })
+      : null;
+    const steps = [];
+    if (mgr) steps.push({ approverId: mgr.id, approverName: `${mgr.firstName} ${mgr.lastName}`, status: "PENDING" });
+    if (adminEmp.id !== mgr?.id) steps.push({ approverId: adminEmp.id, approverName: `${adminEmp.firstName} ${adminEmp.lastName}`, status: "PENDING" });
+    const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+    await db.approvalRequest.create({
+      data: {
+        type: "TIME_OFF", targetId: req.id, requesterId: emp.id,
+        requesterName: `${emp.firstName} ${emp.lastName}`,
+        summary: `${policyName} ${fmt(start)} – ${fmt(end)} (${totalHours}h)`,
+        steps, status: "PENDING",
+      },
+    });
+  }
+
+  await seedPendingTimeOff(jordanReports[1], vacation.id, "Vacation", daysFromNow(14), daysFromNow(18), 5);
+  await seedPendingTimeOff(jordanReports[2], personal.id, "Personal Days", daysFromNow(8), daysFromNow(8), 1);
+  await seedPendingTimeOff(otherActive[5], vacation.id, "Vacation", daysFromNow(21), daysFromNow(25), 5);
+  await seedPendingTimeOff(otherActive[6], sick.id, "Sick Leave", daysFromNow(3), daysFromNow(4), 2);
+
+  // guarantee dashboard celebrations: two birthdays this week, one anniversary this month
+  const bday1 = new Date(NOW); bday1.setFullYear(YEAR - 31); bday1.setDate(bday1.getDate() + 1);
+  const bday2 = new Date(NOW); bday2.setFullYear(YEAR - 27); bday2.setDate(bday2.getDate() + 4);
+  await db.employee.update({ where: { id: otherActive[0].id }, data: { birthDate: bday1 } });
+  await db.employee.update({ where: { id: jordanReports[0].id }, data: { birthDate: bday2 } });
+  const annivDate = new Date(NOW); annivDate.setFullYear(YEAR - 3); annivDate.setDate(15);
+  await db.employee.update({ where: { id: otherActive[1].id }, data: { hireDate: annivDate } });
+
   // ── holidays ──
   const holidays: Array<[string, string]> = [
     ["New Year's Day", `${YEAR}-01-01`],
