@@ -8,6 +8,8 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { faker } from "@faker-js/faker";
 import bcrypt from "bcryptjs";
 import "dotenv/config";
+import { computeStub, previousPayPeriod, payPeriodFor } from "../src/lib/payroll/engine";
+import { splitOvertime } from "../src/lib/timesheets/overtime";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const db = new PrismaClient({ adapter });
@@ -1069,8 +1071,115 @@ async function main() {
     });
   }
 
+  // ── 18 months of PAID payroll history ──
+  console.log("Backfilling payroll history (this takes a moment)...");
+  const schedule = await db.paySchedule.findFirstOrThrow();
+  const payrollEmployees = await db.employee.findMany({
+    where: { status: { not: "ONBOARDING" } },
+    include: {
+      compensations: true,
+      enrollments: { include: { plan: true } },
+    },
+  });
+
+  function currentComp(comps: typeof payrollEmployees[number]["compensations"], asOf: Date) {
+    let best = null as (typeof comps)[number] | null;
+    for (const c of comps) {
+      if (c.effectiveDate <= asOf && (!best || c.effectiveDate > best.effectiveDate)) best = c;
+    }
+    return best;
+  }
+
+  // collect the ~36 previous periods, oldest first
+  const periods: Array<{ start: Date; end: Date; payDate: Date }> = [];
+  let cursorPeriod = previousPayPeriod(NOW);
+  for (let i = 0; i < 36; i++) {
+    periods.unshift(cursorPeriod);
+    cursorPeriod = previousPayPeriod(cursorPeriod.start);
+  }
+
+  for (const period of periods) {
+    const run = await db.payrollRun.create({
+      data: {
+        scheduleId: schedule.id,
+        periodStart: period.start,
+        periodEnd: period.end,
+        payDate: period.payDate,
+        status: "PAID",
+        approvedAt: new Date(period.payDate.getTime() - 24 * 3600 * 1000),
+        paidAt: period.payDate,
+      },
+    });
+    const stubs: Array<{
+      runId: string; employeeId: string; lines: object; grossCents: number; netCents: number;
+    }> = [];
+    for (const emp of payrollEmployees) {
+      // only pay people employed during the period
+      if (emp.hireDate > period.end) continue;
+      if (emp.endDate && emp.endDate < period.start) continue;
+      const comp = currentComp(emp.compensations, period.end);
+      if (!comp) continue;
+      const deductions: Array<{ label: string; amountCents: number }> = [];
+      let retirementPct = 0;
+      for (const e of emp.enrollments) {
+        if (!e.active) continue;
+        if (e.plan.type === "RETIREMENT") { retirementPct = e.electionPct ?? 0; continue; }
+        const tiers = e.plan.tiers as Array<{ tier: string; employeeCostCentsPerPayPeriod: number }>;
+        const tier = tiers.find((t) => t.tier === e.tier);
+        if (tier) deductions.push({ label: e.plan.name, amountCents: tier.employeeCostCentsPerPayPeriod });
+      }
+      const isHourly = comp.payType === "HOURLY";
+      const entries = isHourly
+        ? Array.from({ length: faker.number.int({ min: 9, max: 11 }) }, (_, d) => ({
+            date: new Date(period.start.getTime() + d * 24 * 3600 * 1000),
+            hours: faker.helpers.arrayElement([6, 7, 7.5, 8, 8, 8, 8.5, 9]),
+          }))
+        : [];
+      const split = splitOvertime(entries);
+      const lines = computeStub({
+        payType: comp.payType,
+        amountCents: comp.amountCents,
+        regularHours: split.regularHours,
+        overtimeHours: split.overtimeHours,
+        benefitDeductions: deductions,
+        retirementPct,
+      });
+      stubs.push({
+        runId: run.id,
+        employeeId: emp.id,
+        lines,
+        grossCents: lines.grossCents,
+        netCents: lines.netCents,
+      });
+    }
+    await db.payStub.createMany({ data: stubs.map((s) => ({ ...s, lines: s.lines as object })) });
+  }
+  // NOTE: the CURRENT period intentionally has no run, so the admin demo can
+  // click "Run payroll" and walk draft -> approve -> paid live.
+  void payPeriodFor; // (imported for symmetry; current period computed in-app)
+
+  // ── a little pre-baked audit history so the settings tab looks alive ──
+  const auditSeed: Array<[string, string, string, object | undefined]> = [
+    ["Avery Collins", "PayrollRun", "history", { note: "Approved and paid semi-monthly run" }],
+    ["Avery Collins", "Employee", mgrDemo.id, { via: "annual review", changes: "merit increase" }],
+    ["Sam Whitfield", "Document", "Employee Handbook", { count: 3 }],
+    ["Avery Collins", "ReviewCycle", `Mid-Year ${YEAR} Check-In`, undefined],
+    ["Jordan Blake", "ApprovalRequest", "time off", { type: "TIME_OFF", summary: "Vacation approved" }],
+  ];
+  for (const [i, [actorName, entity, entityId, diff]] of auditSeed.entries()) {
+    await db.auditLog.create({
+      data: {
+        actorName, entity, entityId,
+        action: ["APPROVE", "COMP_CHANGE", "SIGNATURES_REQUESTED", "CREATE", "APPROVED"][i],
+        diff: diff as object | undefined,
+        createdAt: daysAgo(faker.number.int({ min: 1, max: 20 })),
+      },
+    });
+  }
+
   const counts = await db.employee.count();
-  console.log(`Done. ${counts} employees seeded.`);
+  const runCount = await db.payrollRun.count();
+  console.log(`Done. ${counts} employees, ${runCount} payroll runs seeded.`);
 }
 
 main()
