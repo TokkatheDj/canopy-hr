@@ -414,6 +414,60 @@ async function main() {
     await db.companyLink.create({ data: { label: links[i][0], url: links[i][1], order: i } });
   }
 
+  // ── custom fields ──
+  const cfShirt = await db.customFieldDefinition.create({
+    data: {
+      label: "T-shirt size", type: "SELECT", order: 0,
+      options: ["XS", "S", "M", "L", "XL", "XXL"],
+    },
+  });
+  const cfCoffee = await db.customFieldDefinition.create({
+    data: { label: "Go-to coffee order", type: "TEXT", order: 1 },
+  });
+  const cfRemoteStipend = await db.customFieldDefinition.create({
+    data: { label: "Remote stipend enrolled", type: "CHECKBOX", order: 2 },
+  });
+  const coffeeOrders = [
+    "Oat milk latte", "Cold brew, black", "Cappuccino", "Pour-over, single origin",
+    "Espresso, double", "Vanilla latte", "Drip with cream", "Matcha (controversial)",
+  ];
+  for (const emp of activeEmployees) {
+    await db.customFieldValue.create({
+      data: {
+        definitionId: cfShirt.id, employeeId: emp.id,
+        value: faker.helpers.arrayElement(["S", "M", "M", "L", "L", "XL"]),
+      },
+    });
+    await db.customFieldValue.create({
+      data: {
+        definitionId: cfCoffee.id, employeeId: emp.id,
+        value: faker.helpers.arrayElement(coffeeOrders),
+      },
+    });
+    await db.customFieldValue.create({
+      data: {
+        definitionId: cfRemoteStipend.id, employeeId: emp.id,
+        value: String(faker.datatype.boolean()),
+      },
+    });
+  }
+
+  // ── a few assets for the demo employees ──
+  for (const [empId, items] of [
+    [adminEmp.id, [["Laptop", 'MacBook Pro 14"', "C02XK1"], ["Monitor", 'Dell 27" 4K', "DL27-88"]]],
+    [mgrDemo.id, [["Laptop", 'MacBook Pro 16"', "C02XK2"], ["Key card", "HQ badge #142", null]]],
+    [empDemo.id, [["Laptop", "ThinkPad X1 Carbon", "TP-9931"], ["Headset", "Jabra Evolve2", null]]],
+  ] as Array<[string, Array<[string, string, string | null]>]>) {
+    for (const [category, description, serial] of items) {
+      await db.asset.create({
+        data: {
+          employeeId: empId, category, description, serial,
+          assignedOn: daysAgo(faker.number.int({ min: 60, max: 600 })),
+        },
+      });
+    }
+  }
+
   // ── pay schedule (runs generated in later phase) ──
   await db.paySchedule.create({ data: { name: "Semi-Monthly", frequency: "SEMI_MONTHLY" } });
 
