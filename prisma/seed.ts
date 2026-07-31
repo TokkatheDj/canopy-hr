@@ -66,6 +66,7 @@ async function main() {
   await db.announcement.deleteMany();
   await db.companyLink.deleteMany();
   await db.companySettings.deleteMany();
+  await db.payrollRun.deleteMany();
   await db.paySchedule.deleteMany();
   await db.benefitPlan.deleteMany();
   await db.enrollmentWindow.deleteMany();
@@ -674,6 +675,207 @@ async function main() {
       }
       cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
+  }
+
+  // ── hiring: openings, stages, candidates ──
+  const STAGE_NAMES = ["New", "Reviewed", "Phone Screen", "Interview", "Offer", "Hired"];
+  async function createOpening(spec: {
+    title: string; dept: string; loc: string; type: string; description: string;
+  }) {
+    return db.jobOpening.create({
+      data: {
+        title: spec.title, departmentName: spec.dept, locationName: spec.loc,
+        employmentType: spec.type, description: spec.description,
+        stages: { create: STAGE_NAMES.map((name, i) => ({ name, order: i })) },
+      },
+      include: { stages: { orderBy: { order: "asc" } } },
+    });
+  }
+
+  const openingEng = await createOpening({
+    title: "Senior Software Engineer", dept: "Engineering", loc: "Remote", type: "Full-Time",
+    description:
+      "We're looking for a senior engineer to help build the systems behind our subscriptions, wholesale ordering, and roastery operations.\n\nWhat you'll do:\n• Design and ship features across our TypeScript/React/Node stack\n• Partner with roastery and retail teams on internal tools\n• Mentor mid-level engineers\n\nWhat we're looking for:\n• 5+ years building production web applications\n• Strong product instincts and communication\n• Bonus: you really like coffee",
+  });
+  const openingBarista = await createOpening({
+    title: "Barista", dept: "Operations", loc: "Portland HQ", type: "Part-Time",
+    description:
+      "Join the cafe crew at our Portland flagship.\n\nWhat you'll do:\n• Pull shots, pour latte art, and make people's mornings\n• Keep the bar clean, calibrated, and humming\n• Learn our seasonal menu and origin stories\n\nWhat we're looking for:\n• Warmth and hustle — experience is a plus, not a must\n• Weekend availability",
+  });
+  const openingAE = await createOpening({
+    title: "Account Executive", dept: "Sales", loc: "Austin Roastery", type: "Full-Time",
+    description:
+      "Grow our wholesale program across Texas.\n\nWhat you'll do:\n• Own the full sales cycle for cafes, restaurants, and offices\n• Run tastings and trainings for wholesale partners\n• Work closely with the roastery on fulfillment\n\nWhat we're looking for:\n• 2+ years in B2B sales (food & beverage a plus)\n• Comfortable on the road 2-3 days a week",
+  });
+
+  const candidateSpecs: Array<[typeof openingEng, number, string | null]> = [
+    // [opening, stage index, note]
+    [openingEng, 0, null], [openingEng, 1, "Strong resume, ex-Shopify"], [openingEng, 2, null],
+    [openingEng, 3, "Great system design round"], [openingEng, 4, "Offer out — verbal yes"],
+    [openingBarista, 0, null], [openingBarista, 0, null], [openingBarista, 1, null],
+    [openingBarista, 3, "Trial shift went well"],
+    [openingAE, 0, null], [openingAE, 1, null], [openingAE, 2, "Knows the Austin market"],
+    [openingAE, 2, null], [openingAE, 3, null],
+  ];
+  let offerCandidateId: string | null = null;
+  for (const [opening, stageIdx, note] of candidateSpecs) {
+    const first = faker.person.firstName();
+    const last = faker.person.lastName();
+    const cand = await db.candidate.create({
+      data: {
+        openingId: opening.id,
+        stageId: opening.stages[stageIdx].id,
+        firstName: first, lastName: last,
+        email: faker.internet.email({ firstName: first, lastName: last }).toLowerCase(),
+        phone: faker.phone.number({ style: "national" }),
+        coverLetter: faker.datatype.boolean() ? faker.lorem.paragraph() : null,
+        appliedAt: daysAgo(faker.number.int({ min: 2, max: 30 })),
+        events: {
+          create: [
+            { kind: "APPLIED", body: `Applied to ${opening.title} via the careers page` },
+            ...(note ? [{ kind: "NOTE", body: note, actorName: "Avery Collins" }] : []),
+          ],
+        },
+      },
+    });
+    if (opening.id === openingEng.id && stageIdx === 4) offerCandidateId = cand.id;
+  }
+  if (offerCandidateId) {
+    const offerCand = await db.candidate.findUniqueOrThrow({ where: { id: offerCandidateId } });
+    await db.offerLetter.create({
+      data: {
+        candidateId: offerCandidateId,
+        title: "Senior Software Engineer",
+        payType: "SALARY",
+        salaryCents: 112_000_00,
+        startDate: daysFromNow(18),
+        body: `Dear ${offerCand.firstName},\n\nWe're delighted to offer you the position of Senior Software Engineer at Meridian Coffee Co. Your annual salary will be $112,000, with a start date of ${daysFromNow(18).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.\n\nThis offer includes our full benefits package: medical, dental, and vision coverage, a 401(k) with company match, and our time-off policies.\n\nWe can't wait to have you on the team.\n\nWarmly,\nThe Meridian Coffee Co. People Team`,
+      },
+    });
+    await db.candidateEvent.create({
+      data: {
+        candidateId: offerCandidateId, kind: "OFFER_SENT",
+        body: "Offer sent: Senior Software Engineer", actorName: "Avery Collins",
+      },
+    });
+  }
+  await db.talentPool.create({ data: { name: "Future Engineers" } });
+  await db.talentPool.create({ data: { name: "Seasonal Cafe Staff" } });
+
+  // ── checklist templates + instances for onboarding employees ──
+  const onboardingTemplate = await db.checklistTemplate.create({
+    data: {
+      name: "Standard Onboarding", kind: "ONBOARDING",
+      tasks: {
+        create: [
+          { title: "Sign offer letter and employment agreement", assigneeRole: "EMPLOYEE", dueOffsetDays: -5, order: 0 },
+          { title: "Complete W-4 and I-9 paperwork", assigneeRole: "EMPLOYEE", dueOffsetDays: -3, order: 1 },
+          { title: "Order laptop and equipment", assigneeRole: "IT", dueOffsetDays: -3, order: 2 },
+          { title: "Create accounts (email, Slack, HR system)", assigneeRole: "IT", dueOffsetDays: -1, order: 3 },
+          { title: "Welcome coffee with the team", assigneeRole: "MANAGER", dueOffsetDays: 0, order: 4 },
+          { title: "Review the employee handbook", assigneeRole: "EMPLOYEE", dueOffsetDays: 2, order: 5 },
+          { title: "Enroll in benefits", assigneeRole: "EMPLOYEE", dueOffsetDays: 7, order: 6 },
+          { title: "30-day check-in with manager", assigneeRole: "MANAGER", dueOffsetDays: 30, order: 7 },
+        ],
+      },
+    },
+    include: { tasks: { orderBy: { order: "asc" } } },
+  });
+  await db.checklistTemplate.create({
+    data: {
+      name: "Standard Offboarding", kind: "OFFBOARDING",
+      tasks: {
+        create: [
+          { title: "Schedule exit interview", assigneeRole: "HR", dueOffsetDays: -7, order: 0 },
+          { title: "Transfer open work and documentation", assigneeRole: "EMPLOYEE", dueOffsetDays: -3, order: 1 },
+          { title: "Collect laptop, badge, and equipment", assigneeRole: "IT", dueOffsetDays: 0, order: 2 },
+          { title: "Revoke system access", assigneeRole: "IT", dueOffsetDays: 0, order: 3 },
+          { title: "Process final pay and PTO payout", assigneeRole: "HR", dueOffsetDays: 3, order: 4 },
+        ],
+      },
+    },
+  });
+
+  const onboardingEmps = await db.employee.findMany({ where: { status: "ONBOARDING" } });
+  for (const [i, emp] of onboardingEmps.entries()) {
+    await db.checklistInstance.create({
+      data: {
+        templateId: onboardingTemplate.id,
+        employeeId: emp.id,
+        kind: "ONBOARDING",
+        tasks: {
+          create: onboardingTemplate.tasks.map((t, idx) => ({
+            title: t.title,
+            assigneeRole: t.assigneeRole,
+            order: t.order,
+            dueDate: new Date(emp.hireDate.getTime() + t.dueOffsetDays * 24 * 3600 * 1000),
+            // first onboarder is further along than the second
+            completedAt: idx < (i === 0 ? 5 : 2) ? daysAgo(faker.number.int({ min: 1, max: 5 })) : null,
+            completedBy: idx < (i === 0 ? 5 : 2) ? "Sam Whitfield" : null,
+          })),
+        },
+      },
+    });
+  }
+
+  // ── company documents + signature requests ──
+  const handbook = await db.document.create({
+    data: {
+      name: "Employee Handbook",
+      category: "Company Policies",
+      uploadedBy: "Avery Collins",
+      inlineHtml:
+        "<p><strong>Welcome to Meridian Coffee Co.</strong></p>" +
+        "<p>This handbook covers how we work: our values, benefits, time-off policies, and workplace guidelines. It applies to everyone at Meridian, in every location.</p>" +
+        "<p><strong>Our values:</strong> Craft over shortcuts. Warmth over polish. Growth for everyone.</p>" +
+        "<p><strong>Time off:</strong> Vacation accrues each pay period (5 hours). Sick leave (48h) and personal days (24h) are granted each January. Please request time off in the HR system so your team can plan.</p>" +
+        "<p><strong>Payroll:</strong> We pay semi-monthly, on the 15th and the last day of each month.</p>" +
+        "<p><strong>Conduct:</strong> Treat teammates, customers, and partners with respect. Report concerns to People Ops — no retaliation, ever.</p>" +
+        "<p>Please sign below to acknowledge you've read and understood this handbook.</p>",
+    },
+  });
+  await db.document.create({
+    data: {
+      name: "Remote Work Policy",
+      category: "Company Policies",
+      uploadedBy: "Sam Whitfield",
+      inlineHtml:
+        "<p>Remote employees are expected to be reachable during core hours (10am–3pm Pacific), keep their workspace safe and ergonomic, and use the company stipend for equipment needs.</p><p>We gather in person twice a year — attendance is encouraged and fully covered.</p>",
+    },
+  });
+  await db.document.create({
+    data: {
+      name: "Expense Reimbursement Guide",
+      category: "Finance",
+      uploadedBy: "Theo Okafor",
+      inlineHtml:
+        "<p>Submit expenses within 30 days with receipts. Coffee-related professional development (cuppings, competitions, certifications) is reimbursable up to $500/year.</p>",
+    },
+  });
+  await db.document.create({
+    data: {
+      name: "Offer Letter — Signed",
+      category: "Personal",
+      employeeId: empDemo.id,
+      uploadedBy: "Avery Collins",
+      inlineHtml: "<p>Signed offer letter for Riley Chen — Software Engineer, Engineering.</p>",
+    },
+  });
+  // pending signature for the demo employee
+  await db.signatureRequest.create({
+    data: { documentId: handbook.id, signerId: empDemo.id },
+  });
+  // a couple of already-signed handbook acknowledgments
+  for (const emp of [mgrDemo, adminEmp]) {
+    await db.signatureRequest.create({
+      data: {
+        documentId: handbook.id,
+        signerId: emp.id,
+        status: "SIGNED",
+        signedName: `${emp.firstName} ${emp.lastName}`,
+        signedAt: daysAgo(faker.number.int({ min: 10, max: 60 })),
+      },
+    });
   }
 
   const counts = await db.employee.count();
