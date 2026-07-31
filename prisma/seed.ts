@@ -878,6 +878,197 @@ async function main() {
     });
   }
 
+  // ── performance: review cycles, goals, 1:1s ──
+  const REVIEW_QUESTIONS = [
+    { id: "q1", prompt: "What went well this cycle?", type: "text" },
+    { id: "q2", prompt: "What could have gone better?", type: "text" },
+    { id: "q3", prompt: "Overall performance", type: "rating" },
+    { id: "q4", prompt: "Growth & development", type: "rating" },
+  ];
+  const activeWithMgr = await db.employee.findMany({
+    where: { status: "ACTIVE" },
+    select: { id: true, managerId: true },
+  });
+
+  async function seedCycle(name: string, start: Date, end: Date, status: "OPEN" | "CLOSED", fillRate: number) {
+    const cycle = await db.reviewCycle.create({
+      data: { name, startDate: start, endDate: end, status, questions: REVIEW_QUESTIONS },
+    });
+    const positives = [
+      "Shipped consistently and unblocked teammates.",
+      "Great cross-team communication this cycle.",
+      "Took real ownership of quality.",
+      "Customer instincts keep getting sharper.",
+    ];
+    const improvements = [
+      "Could delegate more instead of doing it all.",
+      "Estimates ran optimistic — worth padding.",
+      "More written updates would help visibility.",
+      "Say no to more meetings.",
+    ];
+    for (const emp of activeWithMgr) {
+      const fill = faker.datatype.boolean({ probability: fillRate });
+      const answers = fill
+        ? {
+            q1: faker.helpers.arrayElement(positives),
+            q2: faker.helpers.arrayElement(improvements),
+            q3: faker.number.int({ min: 3, max: 5 }),
+            q4: faker.number.int({ min: 3, max: 5 }),
+          }
+        : undefined;
+      await db.assessment.create({
+        data: {
+          cycleId: cycle.id, subjectId: emp.id, authorId: emp.id, kind: "SELF",
+          status: fill ? "SUBMITTED" : "NOT_STARTED",
+          answers, submittedAt: fill ? faker.date.between({ from: start, to: status === "CLOSED" ? end : NOW }) : null,
+        },
+      });
+      if (emp.managerId) {
+        const mgrFill = faker.datatype.boolean({ probability: fillRate });
+        await db.assessment.create({
+          data: {
+            cycleId: cycle.id, subjectId: emp.id, authorId: emp.managerId, kind: "MANAGER",
+            status: mgrFill ? "SUBMITTED" : "NOT_STARTED",
+            answers: mgrFill
+              ? {
+                  q1: faker.helpers.arrayElement(positives),
+                  q2: faker.helpers.arrayElement(improvements),
+                  q3: faker.number.int({ min: 3, max: 5 }),
+                  q4: faker.number.int({ min: 3, max: 5 }),
+                }
+              : undefined,
+            submittedAt: mgrFill ? faker.date.between({ from: start, to: status === "CLOSED" ? end : NOW }) : null,
+          },
+        });
+      }
+    }
+    return cycle;
+  }
+
+  await seedCycle(`H2 ${YEAR - 1} Review Cycle`, daysAgo(400), daysAgo(370), "CLOSED", 0.95);
+  await seedCycle(`H1 ${YEAR} Review Cycle`, daysAgo(200), daysAgo(170), "CLOSED", 0.9);
+  await seedCycle(`Mid-Year ${YEAR} Check-In`, daysAgo(10), daysFromNow(11), "OPEN", 0.35);
+
+  // goals
+  const goalTitles = [
+    ["Ship the wholesale ordering portal v2", 60],
+    ["Get Q3 roast consistency variance under 3%", 40],
+    ["Grow Austin wholesale accounts to 45", 75],
+    ["Publish the seasonal menu playbook", 25],
+    ["Cut cafe waste by 15%", 55],
+  ] as const;
+  const goalOwners = [empDemo, mgrDemo, ...(await db.employee.findMany({
+    where: { status: "ACTIVE", id: { notIn: [empDemo.id, mgrDemo.id] } }, take: 6,
+  }))];
+  for (const [i, owner] of goalOwners.entries()) {
+    const [title, pct] = goalTitles[i % goalTitles.length];
+    await db.goal.create({
+      data: {
+        employeeId: owner.id,
+        title: i < goalTitles.length ? title : `${title} (${owner.firstName})`,
+        progressPct: pct,
+        status: pct >= 70 ? "ON_TRACK" : pct >= 40 ? "ON_TRACK" : "AT_RISK",
+        dueDate: daysFromNow(faker.number.int({ min: 20, max: 90 })),
+        checkins: {
+          create: [
+            {
+              body: "Kickoff done, scope agreed with stakeholders.",
+              progressPct: Math.max(pct - 30, 5),
+              createdAt: daysAgo(30),
+            },
+            {
+              body: faker.helpers.arrayElement([
+                "Solid progress this week — on schedule.",
+                "Slightly behind after the launch crunch, catching up.",
+                "Ahead of plan; pulling in stretch items.",
+              ]),
+              progressPct: pct,
+              createdAt: daysAgo(6),
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  // 1:1s between demo manager and reports
+  for (const report of jordanReports.slice(0, 2)) {
+    await db.oneOnOne.create({
+      data: {
+        participantAId: mgrDemo.id,
+        participantBId: report.id,
+        date: daysAgo(7),
+        sharedNotes: "Discussed sprint load and the on-call rotation swap.",
+      },
+    });
+  }
+  await db.oneOnOne.create({
+    data: {
+      participantAId: mgrDemo.id,
+      participantBId: empDemo.id,
+      date: daysAgo(3),
+      sharedNotes: "Career chat: aiming for senior track next cycle. Agreed on the wholesale portal as the stretch project.",
+    },
+  });
+
+  // ── eNPS surveys ──
+  const closedSurvey = await db.surveyCycle.create({
+    data: {
+      name: `Spring ${YEAR} Pulse Survey`,
+      startDate: daysAgo(120), endDate: daysAgo(106), status: "CLOSED",
+    },
+  });
+  const springComments = [
+    "Love the team, but the roastery AC really needs fixing before summer.",
+    "Best place I've worked. More cross-office meetups please!",
+    "Growth paths could be clearer for ICs.",
+    "The new espresso benefit is amazing.",
+    "Communication between HQ and remote could improve.",
+  ];
+  const springScores = [9,10,8,9,7,10,9,6,8,9,10,7,8,9,5,9,10,8,7,9,10,9,8,4,9,10,8,9,7,8,9,10,6,9,8,9,10,7,9,8];
+  for (const [i, score] of springScores.entries()) {
+    await db.surveyResponse.create({
+      data: {
+        cycleId: closedSurvey.id, score,
+        comment: i < springComments.length ? springComments[i] : null,
+        createdAt: faker.date.between({ from: daysAgo(120), to: daysAgo(106) }),
+      },
+    });
+  }
+  const springParticipants = faker.helpers.arrayElements(activeWithMgr, springScores.length);
+  for (const p of springParticipants) {
+    await db.surveyParticipation.create({
+      data: { cycleId: closedSurvey.id, employeeId: p.id, respondedAt: daysAgo(110) },
+    });
+  }
+
+  const openSurvey = await db.surveyCycle.create({
+    data: {
+      name: `Summer ${YEAR} Pulse Survey`,
+      startDate: daysAgo(4), endDate: daysFromNow(10), status: "OPEN",
+    },
+  });
+  const summerScores = [9, 8, 10, 7, 9, 6, 9, 10, 8];
+  for (const [i, score] of summerScores.entries()) {
+    await db.surveyResponse.create({
+      data: {
+        cycleId: openSurvey.id, score,
+        comment: i === 0 ? "New timesheet system is so much better." : i === 3 ? "Would love clearer promo criteria." : null,
+        createdAt: faker.date.between({ from: daysAgo(4), to: NOW }),
+      },
+    });
+  }
+  // participants excluding the demo employee so their respond card shows
+  const summerParticipants = faker.helpers.arrayElements(
+    activeWithMgr.filter((e) => e.id !== empDemo.id),
+    summerScores.length,
+  );
+  for (const p of summerParticipants) {
+    await db.surveyParticipation.create({
+      data: { cycleId: openSurvey.id, employeeId: p.id },
+    });
+  }
+
   const counts = await db.employee.count();
   console.log(`Done. ${counts} employees seeded.`);
 }
