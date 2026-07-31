@@ -15,6 +15,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import type { ApprovalStep } from "@/lib/approvals";
+import { AnnounceDialog } from "./announce-dialog";
 
 export const metadata = { title: "Home" };
 
@@ -119,13 +120,16 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          Welcome back, {user.name.split(" ")[0]}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Here&apos;s what&apos;s happening at Meridian Coffee Co. today.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Welcome back, {user.name.split(" ")[0]}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Here&apos;s what&apos;s happening at Meridian Coffee Co. today.
+          </p>
+        </div>
+        {user.role === "ADMIN" && <AnnounceDialog />}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
