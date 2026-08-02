@@ -1,7 +1,9 @@
 "use server";
 
+import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { currentUser } from "@/lib/auth";
 import { require_, AuthzError } from "@/lib/authz";
@@ -19,6 +21,111 @@ function fail(e: unknown): ActionResult {
   if (e instanceof z.ZodError) return { ok: false, error: e.issues[0]?.message ?? "Invalid input" };
   console.error(e);
   return { ok: false, error: "Something went wrong" };
+}
+
+// ── Admin: add an employee directly (no hiring pipeline) ────────
+
+const createEmployeeSchema = z.object({
+  firstName: z.string().min(1).max(60),
+  lastName: z.string().min(1).max(60),
+  workEmail: z.string().email(),
+  personalEmail: z.string().email().or(z.literal("")).optional(),
+  phone: z.string().max(30).optional(),
+  hireDate: z.string(), // yyyy-mm-dd
+  title: z.string().min(1).max(80),
+  departmentName: z.string().min(1),
+  locationName: z.string().min(1),
+  employmentType: z.string().min(1),
+  payType: z.enum(["HOURLY", "SALARY"]),
+  amountDollars: z.coerce.number().positive(),
+  managerId: z.string().optional(),
+  role: z.enum(["ADMIN", "MANAGER", "EMPLOYEE"]),
+});
+
+export type CreateEmployeeResult =
+  | { ok: true; employeeId: string; login: { email: string; tempPassword: string } }
+  | { ok: false; error: string };
+
+export async function createEmployee(
+  input: z.infer<typeof createEmployeeSchema>,
+): Promise<CreateEmployeeResult> {
+  try {
+    const user = require_(await currentUser() ?? undefined, "people.edit");
+    const data = createEmployeeSchema.parse(input);
+    const email = data.workEmail.toLowerCase().trim();
+
+    if (await db.employee.findUnique({ where: { workEmail: email } })) {
+      return { ok: false, error: "An employee with that work email already exists" };
+    }
+    if (await db.user.findUnique({ where: { email } })) {
+      return { ok: false, error: "A login with that email already exists" };
+    }
+
+    const hireDate = new Date(data.hireDate + "T00:00:00Z");
+    const dept = await db.department.findUnique({ where: { name: data.departmentName } });
+    const loc = await db.location.findUnique({ where: { name: data.locationName } });
+
+    const employee = await db.employee.create({
+      data: {
+        firstName: data.firstName.trim(),
+        lastName: data.lastName.trim(),
+        workEmail: email,
+        personalEmail: data.personalEmail?.trim() || null,
+        phone: data.phone?.trim() || null,
+        photoUrl: `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(`${data.firstName}-${data.lastName}`)}&backgroundColor=d1fae5`,
+        hireDate,
+        status: "ACTIVE",
+        managerId: data.managerId || null,
+        departmentId: dept?.id,
+        locationId: loc?.id,
+        jobInfos: {
+          create: {
+            effectiveDate: hireDate,
+            title: data.title,
+            departmentName: data.departmentName,
+            locationName: data.locationName,
+            employmentType: data.employmentType,
+            changeReason: "Hire",
+          },
+        },
+        compensations: {
+          create: {
+            effectiveDate: hireDate,
+            payType: data.payType,
+            amountCents: Math.round(data.amountDollars * 100),
+            changeReason: "Hire",
+          },
+        },
+      },
+    });
+
+    const tempPassword = `canopy-${randomBytes(4).toString("hex")}`;
+    await db.user.create({
+      data: {
+        email,
+        passwordHash: await bcrypt.hash(tempPassword, 10),
+        role: data.role,
+        employeeId: employee.id,
+      },
+    });
+
+    const policies = await db.timeOffPolicy.findMany();
+    for (const p of policies) {
+      await db.policyAssignment.create({
+        data: { employeeId: employee.id, policyId: p.id, startDate: hireDate },
+      });
+    }
+
+    await audit(user, "Employee", employee.id, "CREATE", {
+      via: "manual add",
+      title: data.title,
+    });
+    revalidatePath("/people");
+    return { ok: true, employeeId: employee.id, login: { email, tempPassword } };
+  } catch (e) {
+    const r = fail(e);
+    return r.ok ? { ok: false, error: "Something went wrong" } : r;
+  }
 }
 
 // ── Admin: direct edits ─────────────────────────────────────────

@@ -76,6 +76,8 @@ export async function clockOut(): Promise<ActionResult> {
 const manualSchema = z.object({
   date: z.string(),
   hours: z.coerce.number().positive().max(16),
+  timeIn: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  timeOut: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   note: z.string().max(200).optional(),
 });
 
@@ -95,11 +97,26 @@ export async function addManualEntry(
       // ensurePeriod used the date itself, so this only trips on TZ edge cases
       return { ok: false, error: "Date is outside the current period" };
     }
+    // when both clock times are given, they are the source of truth for hours
+    let clockIn: Date | null = null;
+    let clockOut: Date | null = null;
+    let hours = data.hours;
+    if (data.timeIn && data.timeOut) {
+      clockIn = new Date(`${data.date}T${data.timeIn}:00Z`);
+      clockOut = new Date(`${data.date}T${data.timeOut}:00Z`);
+      if (clockOut <= clockIn) {
+        return { ok: false, error: "Time out must be after time in" };
+      }
+      hours = hoursBetween(clockIn, clockOut);
+      if (hours > 16) return { ok: false, error: "Shift can't be longer than 16 hours" };
+    }
     await db.timesheetEntry.create({
       data: {
         periodId: period.id,
         date,
-        hours: data.hours,
+        clockIn,
+        clockOut,
+        hours,
         note: data.note?.trim() || null,
       },
     });

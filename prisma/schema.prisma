@@ -431,6 +431,10 @@ model Candidate {
   email       String
   phone       String?
   resumeUrl   String?
+  // uploaded resume file (stored in-db; small files only)
+  resumeName  String?
+  resumeType  String?
+  resumeData  Bytes?
   coverLetter String?
   appliedAt   DateTime      @default(now())
   rejectedAt  DateTime?
@@ -469,6 +473,10 @@ model OfferLetter {
   body        String
   sentAt      DateTime  @default(now())
   acceptedAt  DateTime?
+  // public e-sign: candidate opens /offers/[signToken] and types their name
+  signToken   String?   @unique
+  signedName  String?
+  signedAt    DateTime?
 }
 
 // ── Onboarding / offboarding checklists ─────────────────────────

@@ -94,7 +94,24 @@ export function AddEntryDialog() {
   const [open, setOpen] = useState(false);
   const { busy, run } = useAction();
   const today = new Date().toISOString().slice(0, 10);
-  const [form, setForm] = useState({ date: today, hours: "8", note: "" });
+  const [form, setForm] = useState({
+    date: today,
+    hours: "8",
+    timeIn: "",
+    timeOut: "",
+    note: "",
+  });
+
+  // keep the hours field in sync when both clock times are set
+  const withTimes = (next: typeof form) => {
+    if (next.timeIn && next.timeOut) {
+      const [ih, im] = next.timeIn.split(":").map(Number);
+      const [oh, om] = next.timeOut.split(":").map(Number);
+      const diff = (oh * 60 + om - (ih * 60 + im)) / 60;
+      if (diff > 0) next = { ...next, hours: String(Math.round(diff * 100) / 100) };
+    }
+    return next;
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -119,6 +136,26 @@ export function AddEntryDialog() {
               onChange={(e) => setForm({ ...form, date: e.target.value })}
             />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="me-in">Time in (optional)</Label>
+              <Input
+                id="me-in"
+                type="time"
+                value={form.timeIn}
+                onChange={(e) => setForm(withTimes({ ...form, timeIn: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="me-out">Time out (optional)</Label>
+              <Input
+                id="me-out"
+                type="time"
+                value={form.timeOut}
+                onChange={(e) => setForm(withTimes({ ...form, timeOut: e.target.value }))}
+              />
+            </div>
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="me-hours">Hours</Label>
             <Input
@@ -128,6 +165,7 @@ export function AddEntryDialog() {
               max="16"
               step="0.5"
               value={form.hours}
+              disabled={Boolean(form.timeIn && form.timeOut)}
               onChange={(e) => setForm({ ...form, hours: e.target.value })}
             />
           </div>
@@ -146,7 +184,14 @@ export function AddEntryDialog() {
             disabled={busy}
             onClick={async () => {
               const ok = await run(
-                () => addManualEntry({ ...form, hours: Number(form.hours) }),
+                () =>
+                  addManualEntry({
+                    date: form.date,
+                    hours: Number(form.hours),
+                    timeIn: form.timeIn || undefined,
+                    timeOut: form.timeOut || undefined,
+                    note: form.note,
+                  }),
                 "Hours added",
               );
               if (ok) setOpen(false);

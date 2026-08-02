@@ -13,6 +13,7 @@ import { applyToJob } from "@/actions/hiring";
 export function ApplyForm({ openingId }: { openingId: string }) {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [resume, setResume] = useState<File | null>(null);
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -47,8 +48,16 @@ export function ApplyForm({ openingId }: { openingId: string }) {
           className="grid gap-3 sm:grid-cols-2"
           onSubmit={async (e) => {
             e.preventDefault();
+            if (resume && resume.size > 4 * 1024 * 1024) {
+              toast.error("Resume must be 4 MB or smaller");
+              return;
+            }
             setBusy(true);
-            const res = await applyToJob({ openingId, ...form });
+            const fd = new FormData();
+            fd.set("openingId", openingId);
+            for (const [k, v] of Object.entries(form)) fd.set(k, v);
+            if (resume) fd.set("resume", resume);
+            const res = await applyToJob(fd);
             setBusy(false);
             if (res.ok) setDone(true);
             else toast.error(res.error);
@@ -73,6 +82,15 @@ export function ApplyForm({ openingId }: { openingId: string }) {
             <Label htmlFor="a-ph">Phone (optional)</Label>
             <Input id="a-ph" value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="a-resume">Resume (PDF or Word, optional)</Label>
+            <Input
+              id="a-resume"
+              type="file"
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={(e) => setResume(e.target.files?.[0] ?? null)}
+            />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="a-cl">

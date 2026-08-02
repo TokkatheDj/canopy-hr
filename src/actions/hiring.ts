@@ -1,7 +1,9 @@
 "use server";
 
+import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { currentUser } from "@/lib/auth";
 import { require_ } from "@/lib/authz";
@@ -19,11 +21,23 @@ const applySchema = z.object({
   coverLetter: z.string().max(4000).optional(),
 });
 
-export async function applyToJob(
-  input: z.infer<typeof applySchema>,
-): Promise<ActionResult> {
+const RESUME_MIME_TYPES = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
+const MAX_RESUME_BYTES = 4 * 1024 * 1024;
+
+export async function applyToJob(formData: FormData): Promise<ActionResult> {
   try {
-    const data = applySchema.parse(input);
+    const data = applySchema.parse({
+      openingId: formData.get("openingId"),
+      firstName: formData.get("firstName"),
+      lastName: formData.get("lastName"),
+      email: formData.get("email"),
+      phone: formData.get("phone") || undefined,
+      coverLetter: formData.get("coverLetter") || undefined,
+    });
     const opening = await db.jobOpening.findUnique({
       where: { id: data.openingId },
       include: { stages: { orderBy: { order: "asc" }, take: 1 } },
@@ -34,6 +48,26 @@ export async function applyToJob(
     const firstStage = opening.stages[0];
     if (!firstStage) return { ok: false, error: "Opening is misconfigured" };
 
+    const resume = formData.get("resume");
+    let resumeFields: {
+      resumeName: string;
+      resumeType: string;
+      resumeData: Uint8Array<ArrayBuffer>;
+    } | null = null;
+    if (resume instanceof File && resume.size > 0) {
+      if (resume.size > MAX_RESUME_BYTES) {
+        return { ok: false, error: "Resume must be 4 MB or smaller" };
+      }
+      if (!RESUME_MIME_TYPES.includes(resume.type)) {
+        return { ok: false, error: "Resume must be a PDF or Word document" };
+      }
+      resumeFields = {
+        resumeName: resume.name.slice(0, 120),
+        resumeType: resume.type,
+        resumeData: new Uint8Array(await resume.arrayBuffer()),
+      };
+    }
+
     const candidate = await db.candidate.create({
       data: {
         openingId: opening.id,
@@ -43,6 +77,7 @@ export async function applyToJob(
         email: data.email.toLowerCase().trim(),
         phone: data.phone?.trim() || null,
         coverLetter: data.coverLetter?.trim() || null,
+        ...(resumeFields ?? {}),
         events: {
           create: {
             kind: "APPLIED",
@@ -170,7 +205,7 @@ export async function sendOffer(input: z.infer<typeof offerSchema>): Promise<Act
       `a 401(k) with company match, and our time-off policies.\n\n` +
       `We can't wait to have you on the team.\n\nWarmly,\nThe Meridian Coffee Co. People Team`;
 
-    await db.offerLetter.upsert({
+    const offer = await db.offerLetter.upsert({
       where: { candidateId: data.candidateId },
       create: {
         candidateId: data.candidateId,
@@ -179,9 +214,17 @@ export async function sendOffer(input: z.infer<typeof offerSchema>): Promise<Act
         salaryCents,
         startDate: start,
         body,
+        signToken: randomBytes(24).toString("base64url"),
       },
       update: { title: data.title, payType: data.payType, salaryCents, startDate: start, body },
     });
+    // offers created before e-sign existed have no token yet
+    if (!offer.signToken) {
+      await db.offerLetter.update({
+        where: { id: offer.id },
+        data: { signToken: randomBytes(24).toString("base64url") },
+      });
+    }
     await db.candidateEvent.create({
       data: {
         candidateId: data.candidateId,
@@ -199,12 +242,62 @@ export async function sendOffer(input: z.infer<typeof offerSchema>): Promise<Act
   }
 }
 
+// ── Public: candidate signs their offer letter (no auth; token is the secret) ──
+
+export async function signOffer(token: string, name: string): Promise<ActionResult> {
+  try {
+    const signedName = z.string().min(2).max(100).parse(name.trim());
+    const offer = await db.offerLetter.findUnique({
+      where: { signToken: z.string().min(10).parse(token) },
+      include: { candidate: true },
+    });
+    if (!offer) return { ok: false, error: "This offer link is no longer valid" };
+    if (offer.signedAt) return { ok: false, error: "This offer has already been signed" };
+
+    const now = new Date();
+    await db.offerLetter.update({
+      where: { id: offer.id },
+      data: { signedName, signedAt: now, acceptedAt: offer.acceptedAt ?? now },
+    });
+    await db.candidateEvent.create({
+      data: {
+        candidateId: offer.candidateId,
+        kind: "OFFER_SIGNED",
+        body: `Offer signed by ${signedName}`,
+        actorName: `${offer.candidate.firstName} ${offer.candidate.lastName}`,
+      },
+    });
+    const admins = await db.user.findMany({ where: { role: "ADMIN" } });
+    if (admins.length > 0) {
+      await db.notification.createMany({
+        data: admins.map((a) => ({
+          userId: a.id,
+          title: "Offer signed",
+          body: `${offer.candidate.firstName} ${offer.candidate.lastName} signed their offer`,
+          href: `/hiring/candidates/${offer.candidateId}`,
+        })),
+      });
+    }
+    await audit(null, "OfferLetter", offer.id, "SIGNED", { signedName });
+    revalidatePath(`/hiring/candidates/${offer.candidateId}`);
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof z.ZodError) return { ok: false, error: e.issues[0]?.message ?? "Invalid input" };
+    console.error(e);
+    return { ok: false, error: "Something went wrong" };
+  }
+}
+
+export type MarkHiredResult =
+  | { ok: true; login: { email: string; tempPassword: string } | null }
+  | { ok: false; error: string };
+
 /**
  * Converts an offer-holding candidate into an Employee: creates the employee
- * record with effective-dated job/comp rows, assigns time-off policies, and
- * spins up the onboarding checklist.
+ * record with effective-dated job/comp rows, assigns time-off policies,
+ * creates their login, and spins up the onboarding checklist.
  */
-export async function markHired(candidateId: string): Promise<ActionResult> {
+export async function markHired(candidateId: string): Promise<MarkHiredResult> {
   try {
     const user = require_(await currentUser() ?? undefined, "hiring.manage");
     const candidate = await db.candidate.findUniqueOrThrow({
@@ -255,6 +348,22 @@ export async function markHired(candidateId: string): Promise<ActionResult> {
       },
     });
 
+    // login account so the new hire can sign in and complete onboarding
+    let login: { email: string; tempPassword: string } | null = null;
+    const existingUser = await db.user.findUnique({ where: { email: employee.workEmail } });
+    if (!existingUser) {
+      const tempPassword = `canopy-${randomBytes(4).toString("hex")}`;
+      await db.user.create({
+        data: {
+          email: employee.workEmail,
+          passwordHash: await bcrypt.hash(tempPassword, 10),
+          role: "EMPLOYEE",
+          employeeId: employee.id,
+        },
+      });
+      login = { email: employee.workEmail, tempPassword };
+    }
+
     // assign all time-off policies
     const policies = await db.timeOffPolicy.findMany();
     for (const p of policies) {
@@ -292,7 +401,7 @@ export async function markHired(candidateId: string): Promise<ActionResult> {
       where: { id: candidateId },
       data: {
         hiredEmployeeId: employee.id,
-        offer: { update: { acceptedAt: new Date() } },
+        offer: { update: { acceptedAt: offer.acceptedAt ?? new Date() } },
         events: {
           create: {
             kind: "HIRED",
@@ -310,7 +419,7 @@ export async function markHired(candidateId: string): Promise<ActionResult> {
     revalidatePath("/hiring");
     revalidatePath("/onboarding");
     revalidatePath("/people");
-    return { ok: true };
+    return { ok: true, login };
   } catch (e) {
     console.error(e);
     return { ok: false, error: "Something went wrong" };

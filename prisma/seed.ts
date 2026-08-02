@@ -667,11 +667,15 @@ async function main() {
     while (cursor <= stop) {
       const dow = cursor.getUTCDay();
       if (dow !== 0 && dow !== 6 && faker.datatype.boolean({ probability: 0.92 })) {
+        const hours = faker.helpers.arrayElement([6, 7, 7.5, 8, 8, 8, 8.5, 9, 10]);
+        const clockIn = new Date(cursor.getTime() + 9 * 3600 * 1000);
         await db.timesheetEntry.create({
           data: {
             periodId: period.id,
             date: new Date(cursor),
-            hours: faker.helpers.arrayElement([6, 7, 7.5, 8, 8, 8, 8.5, 9, 10]),
+            clockIn,
+            clockOut: new Date(clockIn.getTime() + hours * 3600 * 1000),
+            hours,
           },
         });
       }

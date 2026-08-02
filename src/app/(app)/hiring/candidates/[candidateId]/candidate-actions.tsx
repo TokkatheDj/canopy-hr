@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, FileSignature, UserRoundCheck, UserRoundX } from "lucide-react";
+import { Loader2, FileSignature, UserRoundCheck, UserRoundX, Link2, Check } from "lucide-react";
 import {
   moveCandidate,
   addCandidateNote,
@@ -232,6 +232,12 @@ export function MarkHiredButton({ candidateId }: { candidateId: string }) {
         setBusy(false);
         if (res.ok) {
           toast.success("Hired! Employee record + onboarding checklist created");
+          if (res.login) {
+            toast.info(
+              `Login created for the new hire — ${res.login.email} · temp password: ${res.login.tempPassword}`,
+              { duration: 60_000, closeButton: true },
+            );
+          }
           router.refresh();
         } else {
           toast.error(res.error);
@@ -244,6 +250,25 @@ export function MarkHiredButton({ candidateId }: { candidateId: string }) {
         <UserRoundCheck className="size-3.5" />
       )}
       Mark hired
+    </Button>
+  );
+}
+
+export function CopyOfferLinkButton({ token }: { token: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={async () => {
+        await navigator.clipboard.writeText(`${location.origin}/offers/${token}`);
+        setCopied(true);
+        toast.success("Signing link copied to clipboard");
+        setTimeout(() => setCopied(false), 2000);
+      }}
+    >
+      {copied ? <Check className="size-3.5" /> : <Link2 className="size-3.5" />}
+      Copy signing link
     </Button>
   );
 }

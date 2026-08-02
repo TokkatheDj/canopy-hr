@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { db } from "@/lib/db";
 import { currentUser } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,6 +86,14 @@ export default async function InboxPage() {
                       </Badge>
                       <span className="font-medium">{a.requesterName}</span>
                       <span className="text-muted-foreground"> · {a.summary}</span>
+                      {a.type === "TIMESHEET" && a.targetId && (
+                        <Link
+                          href={`/timesheets/${a.targetId}`}
+                          className="ml-2 text-sm text-emerald-700 hover:underline dark:text-emerald-400"
+                        >
+                          View entries
+                        </Link>
+                      )}
                     </div>
                     <ApprovalActions approvalId={a.id} />
                   </div>
