@@ -79,6 +79,10 @@ async function main() {
   await db.surveyCycle.deleteMany();
   await db.document.deleteMany();
   await db.customFieldDefinition.deleteMany();
+  await db.recognition.deleteMany();
+  await db.coreValue.deleteMany();
+  await db.trainingCourse.deleteMany();
+  await db.trainingCategory.deleteMany();
 
   // ── org scaffolding ──
   const [ops, eng, sales, mktg, people] = await Promise.all(
@@ -1161,6 +1165,82 @@ async function main() {
   // NOTE: the CURRENT period intentionally has no run, so the admin demo can
   // click "Run payroll" and walk draft -> approve -> paid live.
   void payPeriodFor; // (imported for symmetry; current period computed in-app)
+
+  // ── core values & recognition feed ──
+  const coreValueSeed = [
+    ["Integrity", "We do the right thing, even when nobody is watching.", "shield"],
+    ["Teamwork", "We win together and cover for each other.", "users"],
+    ["Customer Focus", "Every decision starts with the customer.", "handshake"],
+    ["Caring", "We look out for the people around us.", "heart-handshake"],
+    ["Grit", "We keep going when the work gets hard.", "mountain"],
+    ["Innovation", "We look for a better way, every day.", "rocket"],
+  ] as const;
+  const coreValues = [];
+  for (const [name, description, icon] of coreValueSeed) {
+    coreValues.push(await db.coreValue.create({ data: { name, description, icon } }));
+  }
+  const recogMessages = [
+    "Stayed late to help close out the quarter — total lifesaver.",
+    "Handled a tough customer call with so much patience and grace.",
+    "Jumped in to cover a shift with zero notice. Legend.",
+    "The new onboarding doc is SO much clearer now. Thank you!",
+    "Caught a nasty bug before it shipped. Eagle eyes.",
+    "Made a new teammate feel at home on day one.",
+    "Turned a chaotic launch week into a smooth one.",
+    "Best demo I've seen all year — customers were smiling.",
+    "Quietly does the unglamorous work that keeps us running.",
+    "Brought donuts AND fixed the espresso machine. Hero.",
+  ];
+  for (let i = 0; i < 14; i++) {
+    const giver = faker.helpers.arrayElement(activeEmployees);
+    const pool = activeEmployees.filter((e) => e.id !== giver.id);
+    const recipients = faker.helpers.arrayElements(pool, faker.number.int({ min: 1, max: 2 }));
+    await db.recognition.create({
+      data: {
+        giverId: giver.id,
+        message: faker.helpers.arrayElement(recogMessages),
+        points: faker.helpers.arrayElement([5, 10, 15, 20, 25]),
+        coreValueId: faker.helpers.arrayElement(coreValues).id,
+        createdAt: daysAgo(faker.number.int({ min: 0, max: 30 })),
+        recipients: { create: recipients.map((r) => ({ employeeId: r.id })) },
+      },
+    });
+  }
+
+  // ── training courses & completion records ──
+  const catStarting = await db.trainingCategory.create({ data: { name: "Getting Started", order: 1 } });
+  const catAnnual = await db.trainingCategory.create({ data: { name: "Required Annual Trainings", order: 2 } });
+  const catSafety = await db.trainingCategory.create({ data: { name: "Safety", order: 3 } });
+  const courseSeed: Array<[string, string, boolean, number | null, number | null]> = [
+    ["Company Handbook Quiz", catStarting.id, true, null, 14],
+    ["Customer Service Basics", catStarting.id, false, null, 30],
+    ["Anti-Harassment Training", catAnnual.id, true, 12, 10],
+    ["Food Safety & Hygiene", catAnnual.id, true, 12, 7],
+    ["OSHA Workplace Safety", catSafety.id, true, 12, 7],
+    ["Chemical Handling (SDS) Refresher", catSafety.id, true, 6, 10],
+    ["CPR & First Aid", catSafety.id, false, 24, null],
+  ];
+  const trainingCourses = [];
+  for (const [name, categoryId, required, frequencyMonths, dueDaysFromHire] of courseSeed) {
+    trainingCourses.push(
+      await db.trainingCourse.create({
+        data: { name, categoryId, required, frequencyMonths, dueDaysFromHire },
+      }),
+    );
+  }
+  for (const course of trainingCourses) {
+    const windowDays = (course.frequencyMonths ?? 12) * 30 - 10;
+    for (const emp of activeEmployees) {
+      if (!faker.datatype.boolean({ probability: 0.85 })) continue;
+      await db.trainingRecord.create({
+        data: {
+          courseId: course.id,
+          employeeId: emp.id,
+          completedAt: daysAgo(faker.number.int({ min: 5, max: windowDays })),
+        },
+      });
+    }
+  }
 
   // ── a little pre-baked audit history so the settings tab looks alive ──
   const auditSeed: Array<[string, string, string, object | undefined]> = [

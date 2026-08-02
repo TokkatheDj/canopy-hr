@@ -87,6 +87,25 @@ export default async function ReportsPage() {
     value: Math.round(r.stubs.reduce((a, s) => a + s.grossCents, 0) / 100),
   }));
 
+  // Signed documents: per-document e-signature completion (admin only)
+  const signedDocs = isAdmin
+    ? (
+        await db.document.findMany({
+          where: { signatureRequests: { some: {} } },
+          include: { signatureRequests: { select: { status: true, requestedAt: true } } },
+        })
+      ).map((d) => ({
+        id: d.id,
+        name: d.name,
+        completed: d.signatureRequests.filter((r) => r.status === "SIGNED").length,
+        pending: d.signatureRequests.filter((r) => r.status === "PENDING").length,
+        lastSent: d.signatureRequests.reduce(
+          (a, r) => (r.requestedAt > a ? r.requestedAt : a),
+          new Date(0),
+        ),
+      }))
+    : [];
+
   // Time-off liability: outstanding vacation hours × hourly-equivalent rate
   let liabilityHours = 0;
   let liabilityCents = 0;
@@ -163,6 +182,55 @@ export default async function ReportsPage() {
           />
         )}
       </div>
+
+      {signedDocs.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Signed documents</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Document</TableHead>
+                  <TableHead className="text-right">Completed</TableHead>
+                  <TableHead className="text-right">Pending</TableHead>
+                  <TableHead className="text-right">Last sent</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {signedDocs.map((d) => (
+                  <TableRow key={d.id}>
+                    <TableCell>
+                      <Link
+                        href={`/files/${d.id}`}
+                        className="text-emerald-700 hover:underline dark:text-emerald-400"
+                      >
+                        {d.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-right">{d.completed}</TableCell>
+                    <TableCell className="text-right">
+                      {d.pending > 0 ? (
+                        <span className="text-amber-600">{d.pending}</span>
+                      ) : (
+                        0
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {d.lastSent.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        timeZone: "UTC",
+                      })}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

@@ -94,6 +94,9 @@ model Employee {
   customFieldValues    CustomFieldValue[]
   surveyParticipations SurveyParticipation[]
   hiredFromCandidate   Candidate?
+  trainingRecords      TrainingRecord[]
+  recognitionsGiven    Recognition[]          @relation("RecognitionGiven")
+  recognitionsReceived RecognitionRecipient[] @relation("RecognitionReceived")
 
   @@index([status])
   @@index([managerId])
@@ -749,6 +752,77 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
+}
+
+// ── Training (compliance courses) ───────────────────────────────
+
+model TrainingCategory {
+  id      String           @id @default(cuid())
+  name    String           @unique
+  order   Int
+  courses TrainingCourse[]
+}
+
+model TrainingCourse {
+  id              String            @id @default(cuid())
+  name            String            @unique
+  category        TrainingCategory? @relation(fields: [categoryId], references: [id])
+  categoryId      String?
+  required        Boolean           @default(false)
+  // null = one-time; otherwise repeats every N months
+  frequencyMonths Int?
+  // due N days after hire date (null = no deadline)
+  dueDaysFromHire Int?
+  records         TrainingRecord[]
+}
+
+model TrainingRecord {
+  id          String         @id @default(cuid())
+  course      TrainingCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId    String
+  employee    Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId  String
+  completedAt DateTime
+  note        String?
+
+  @@index([employeeId])
+  @@index([courseId, completedAt])
+}
+
+// ── Recognition & core values ───────────────────────────────────
+
+model CoreValue {
+  id           String        @id @default(cuid())
+  name         String        @unique
+  description  String
+  // lucide icon name, e.g. "handshake"
+  icon         String?
+  recognitions Recognition[]
+}
+
+model Recognition {
+  id          String                  @id @default(cuid())
+  giver       Employee                @relation("RecognitionGiven", fields: [giverId], references: [id], onDelete: Cascade)
+  giverId     String
+  message     String
+  points      Int                     @default(10)
+  coreValue   CoreValue?              @relation(fields: [coreValueId], references: [id])
+  coreValueId String?
+  createdAt   DateTime                @default(now())
+  recipients  RecognitionRecipient[]
+
+  @@index([createdAt])
+}
+
+model RecognitionRecipient {
+  id            String      @id @default(cuid())
+  recognition   Recognition @relation(fields: [recognitionId], references: [id], onDelete: Cascade)
+  recognitionId String
+  employee      Employee    @relation("RecognitionReceived", fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId    String
+
+  @@unique([recognitionId, employeeId])
+  @@index([employeeId])
 }
 
 // ── Company content & settings ──────────────────────────────────

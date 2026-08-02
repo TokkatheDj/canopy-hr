@@ -14,6 +14,8 @@ import {
   Inbox,
   Settings,
   CircleUserRound,
+  GraduationCap,
+  Award,
   type LucideIcon,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/authz";
@@ -40,6 +42,8 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Payroll", href: "/payroll", icon: Banknote, show: adminOnly },
   { label: "Benefits", href: "/benefits", icon: HeartPulse, show: everyone },
   { label: "Performance", href: "/performance", icon: Target, show: everyone },
+  { label: "Training", href: "/training", icon: GraduationCap, show: everyone },
+  { label: "Recognition", href: "/recognition", icon: Award, show: everyone },
   { label: "Surveys", href: "/surveys", icon: MessageSquareHeart, show: everyone },
   { label: "Reports", href: "/reports", icon: BarChart3, show: managersUp },
   { label: "Files", href: "/files", icon: FolderOpen, show: everyone },

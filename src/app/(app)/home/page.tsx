@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { currentUser } from "@/lib/auth";
 import { balancesFor } from "@/lib/timeoff/materialize";
+import { payPeriodFor } from "@/lib/payroll/engine";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,9 +14,12 @@ import {
   Inbox as InboxIcon,
   ExternalLink,
   CalendarDays,
+  Clock3,
+  GraduationCap,
 } from "lucide-react";
 import type { ApprovalStep } from "@/lib/approvals";
 import { AnnounceDialog } from "./announce-dialog";
+import { ClockButtons } from "@/app/(app)/timesheets/timesheet-client";
 
 export const metadata = { title: "Home" };
 
@@ -114,6 +118,58 @@ export default async function HomePage() {
   });
 
   const balances = user.employeeId ? await balancesFor(user.employeeId) : [];
+
+  // My Time: today's and period hours plus clock state
+  let myTime: {
+    todayHours: number;
+    periodHours: number;
+    clockedInSince: string | null;
+    periodEditable: boolean;
+  } | null = null;
+  if (user.employeeId) {
+    const { start } = payPeriodFor(today);
+    const period = await db.timesheetPeriod.findUnique({
+      where: {
+        employeeId_periodStart: { employeeId: user.employeeId, periodStart: start },
+      },
+      include: { entries: true },
+    });
+    const entries = period?.entries ?? [];
+    const open = entries.find((e) => e.clockIn && !e.clockOut);
+    const todayHours = entries
+      .filter((e) => e.date.getTime() === today.getTime())
+      .reduce((a, e) => a + e.hours, 0);
+    myTime = {
+      todayHours: Math.round(todayHours * 100) / 100,
+      periodHours:
+        Math.round(entries.reduce((a, e) => a + e.hours, 0) * 100) / 100,
+      clockedInSince: open?.clockIn?.toISOString() ?? null,
+      periodEditable: !period || period.status === "DRAFT",
+    };
+  }
+
+  // Required trainings needing attention (missing, or repeat-window expired)
+  let openTrainings = 0;
+  if (user.employeeId) {
+    const required = await db.trainingCourse.findMany({
+      where: { required: true },
+      include: {
+        records: {
+          where: { employeeId: user.employeeId },
+          orderBy: { completedAt: "desc" },
+          take: 1,
+        },
+      },
+    });
+    openTrainings = required.filter((c) => {
+      const rec = c.records[0];
+      if (!rec) return true;
+      if (!c.frequencyMonths) return false;
+      const due = new Date(rec.completedAt);
+      due.setUTCMonth(due.getUTCMonth() + c.frequencyMonths);
+      return due < today;
+    }).length;
+  }
 
   const fmtDate = (d: Date) =>
     d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
@@ -232,6 +288,68 @@ export default async function HomePage() {
 
         {/* Right column */}
         <div className="space-y-4">
+          {myTime && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Clock3 className="size-4 text-emerald-600" /> My time
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <div className="text-2xl font-bold">{myTime.todayHours}h</div>
+                    <div className="text-xs text-muted-foreground">today</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold">{myTime.periodHours}h</div>
+                    <div className="text-xs text-muted-foreground">this period</div>
+                  </div>
+                </div>
+                <ClockButtons
+                  clockedIn={Boolean(myTime.clockedInSince)}
+                  clockedInSince={myTime.clockedInSince}
+                  periodEditable={myTime.periodEditable}
+                />
+                <Link
+                  href="/timesheets"
+                  className="block text-sm text-emerald-700 hover:underline dark:text-emerald-400"
+                >
+                  Open timesheet →
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+
+          {user.employeeId && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <GraduationCap className="size-4 text-emerald-600" /> My trainings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm">
+                {openTrainings > 0 ? (
+                  <p>
+                    <span className="font-semibold text-red-600">{openTrainings}</span>{" "}
+                    required {openTrainings === 1 ? "training needs" : "trainings need"}{" "}
+                    attention.
+                  </p>
+                ) : (
+                  <p className="text-muted-foreground">
+                    All required trainings up to date. 🎉
+                  </p>
+                )}
+                <Link
+                  href="/training"
+                  className="mt-1 block text-emerald-700 hover:underline dark:text-emerald-400"
+                >
+                  Go to training →
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+
           {balances.length > 0 && (
             <Card>
               <CardHeader>
