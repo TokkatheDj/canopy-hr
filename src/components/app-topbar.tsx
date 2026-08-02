@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -70,12 +71,14 @@ export function AppTopbar({
             </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuLabel className="truncate">
-              <div className="font-medium">{user.name}</div>
-              <div className="text-xs font-normal text-muted-foreground truncate">
-                {user.email}
-              </div>
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="truncate">
+                <div className="font-medium">{user.name}</div>
+                <div className="text-xs font-normal text-muted-foreground truncate">
+                  {user.email}
+                </div>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem render={<Link href="/my-info" />}>
               <UserRound className="size-4" /> My Info

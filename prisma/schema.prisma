@@ -825,6 +825,21 @@ model RecognitionRecipient {
   @@index([employeeId])
 }
 
+// ── Tester feedback / questions (in-app direct line to the dev) ─
+
+model Feedback {
+  id         String    @id @default(cuid())
+  authorName String
+  path       String?
+  body       String
+  createdAt  DateTime  @default(now())
+  answer     String?
+  answeredAt DateTime?
+  answeredBy String?
+
+  @@index([createdAt])
+}
+
 // ── Company content & settings ──────────────────────────────────
 
 model Announcement {
