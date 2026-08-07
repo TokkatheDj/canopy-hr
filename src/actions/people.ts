@@ -71,20 +71,51 @@ export async function adminAddJobChange(
   try {
     const user = require_(await currentUser() ?? undefined, "people.edit");
     const data = jobChangeSchema.parse(input);
-    await db.jobInfo.create({
-      data: { ...data, effectiveDate: new Date(data.effectiveDate + "T00:00:00Z") },
+    const effectiveDate = new Date(data.effectiveDate + "T00:00:00Z");
+
+    // Resolve the names BEFORE writing anything. Prisma silently omits a field
+    // whose value is `undefined`, so an unrecognised name used to leave
+    // JobInfo.departmentName and Employee.departmentId disagreeing forever,
+    // with no error raised anywhere. Fail loudly instead.
+    const [dept, loc] = await Promise.all([
+      db.department.findUnique({ where: { name: data.departmentName } }),
+      db.location.findUnique({ where: { name: data.locationName } }),
+    ]);
+    if (!dept) return { ok: false, error: `Unknown department: ${data.departmentName}` };
+    if (!loc) return { ok: false, error: `Unknown location: ${data.locationName}` };
+
+    const created = await db.jobInfo.create({ data: { ...data, effectiveDate } });
+
+    // The denormalized refs on Employee describe the job in force TODAY, so
+    // sync them only when this record is the one in force. Previously any job
+    // change rewrote them immediately: a transfer dated next month moved the
+    // person early (directory said one thing, Job tab another), and a
+    // back-dated correction overwrote current data with historical values.
+    const now = new Date();
+    const supersededByLaterChange = await db.jobInfo.findFirst({
+      where: {
+        employeeId: data.employeeId,
+        id: { not: created.id },
+        effectiveDate: { gt: effectiveDate, lte: now },
+      },
+      select: { id: true },
     });
-    // keep denormalized department/location refs in sync when effective now
-    const dept = await db.department.findUnique({ where: { name: data.departmentName } });
-    const loc = await db.location.findUnique({ where: { name: data.locationName } });
-    await db.employee.update({
-      where: { id: data.employeeId },
-      data: { departmentId: dept?.id, locationId: loc?.id },
-    });
+    const inForceNow = effectiveDate <= now && !supersededByLaterChange;
+
+    if (inForceNow) {
+      await db.employee.update({
+        where: { id: data.employeeId },
+        data: { departmentId: dept.id, locationId: loc.id },
+      });
+    }
+
     await audit(user, "Employee", data.employeeId, "JOB_CHANGE", {
       title: data.title,
       effectiveDate: data.effectiveDate,
       reason: data.changeReason,
+      // Recorded because "why didn't the directory change?" is otherwise
+      // indistinguishable from a bug.
+      appliedToProfileNow: inForceNow,
     });
     revalidatePath(`/people/${data.employeeId}`);
     return { ok: true };
