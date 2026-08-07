@@ -86,6 +86,13 @@ export default async function EmployeeProfilePage({
   );
   const canSeeComp = isAdmin || isSelf || (isDirectManager && managersSeeComp);
 
+  // Home address, personal email, phone, birthday and emergency contacts used
+  // to render for every authenticated user, while notes and compensation were
+  // gated a few lines away in this same file — so this was an oversight, not a
+  // policy. The directory stays company-wide (name, photo, title, department,
+  // location, work email); the personal file does not.
+  const canSeePersonalDetails = isAdmin || isSelf || isDirectManager;
+
   const job = currentAsOf(emp.jobInfos);
   const comp = currentAsOf(emp.compensations);
   const jobHistory = sortedHistory(emp.jobInfos);
@@ -149,7 +156,9 @@ export default async function EmployeeProfilePage({
         <TabsList>
           <TabsTrigger value="personal">Personal</TabsTrigger>
           <TabsTrigger value="job">Job</TabsTrigger>
-          <TabsTrigger value="emergency">Emergency</TabsTrigger>
+          {canSeePersonalDetails && (
+            <TabsTrigger value="emergency">Emergency</TabsTrigger>
+          )}
           {(isAdmin || isDirectManager) && (
             <TabsTrigger value="notes">Notes</TabsTrigger>
           )}
@@ -182,34 +191,43 @@ export default async function EmployeeProfilePage({
                   <dt className="text-muted-foreground">Work email</dt>
                   <dd>{emp.workEmail}</dd>
                 </div>
-                <div>
-                  <dt className="text-muted-foreground">Personal email</dt>
-                  <dd>{emp.personalEmail ?? "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Phone</dt>
-                  <dd>{emp.phone ?? "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Birthday</dt>
-                  <dd>
-                    {emp.birthDate
-                      ? emp.birthDate.toLocaleDateString("en-US", {
-                          month: "long",
-                          day: "numeric",
-                          timeZone: "UTC",
-                        })
-                      : "—"}
-                  </dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-muted-foreground">Address</dt>
-                  <dd>
-                    {[emp.address, emp.city, emp.state, emp.zip]
-                      .filter(Boolean)
-                      .join(", ") || "—"}
-                  </dd>
-                </div>
+                {canSeePersonalDetails ? (
+                  <>
+                    <div>
+                      <dt className="text-muted-foreground">Personal email</dt>
+                      <dd>{emp.personalEmail ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Phone</dt>
+                      <dd>{emp.phone ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Birthday</dt>
+                      <dd>
+                        {emp.birthDate
+                          ? emp.birthDate.toLocaleDateString("en-US", {
+                              month: "long",
+                              day: "numeric",
+                              timeZone: "UTC",
+                            })
+                          : "—"}
+                      </dd>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <dt className="text-muted-foreground">Address</dt>
+                      <dd>
+                        {[emp.address, emp.city, emp.state, emp.zip]
+                          .filter(Boolean)
+                          .join(", ") || "—"}
+                      </dd>
+                    </div>
+                  </>
+                ) : (
+                  <div className="sm:col-span-2 text-muted-foreground">
+                    Personal contact details are visible to {emp.firstName}, their
+                    manager, and HR.
+                  </div>
+                )}
               </dl>
             </CardContent>
           </Card>
@@ -339,6 +357,7 @@ export default async function EmployeeProfilePage({
         </TabsContent>
 
         {/* ── Emergency ── */}
+        {canSeePersonalDetails && (
         <TabsContent value="emergency" className="pt-2">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -375,6 +394,7 @@ export default async function EmployeeProfilePage({
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
         {/* ── Notes (managers/admin) ── */}
         {(isAdmin || isDirectManager) && (

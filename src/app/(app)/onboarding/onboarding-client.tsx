@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toLocalISODate } from "@/lib/utils";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -62,7 +63,7 @@ export function StartOffboardingDialog({
   const twoWeeks = new Date();
   twoWeeks.setDate(twoWeeks.getDate() + 14);
   const [employeeId, setEmployeeId] = useState("");
-  const [lastDay, setLastDay] = useState(twoWeeks.toISOString().slice(0, 10));
+  const [lastDay, setLastDay] = useState(toLocalISODate(twoWeeks));
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

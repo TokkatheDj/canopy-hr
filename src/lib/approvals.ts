@@ -12,6 +12,12 @@ export type ApprovalStep = {
   approverName: string;
   status: "PENDING" | "APPROVED" | "DENIED";
   actedAt?: string;
+  // Set only when an ADMIN acted in place of the assigned approver. Without
+  // these the step still reads "Approved — Dana Whitfield" when Dana never
+  // touched it, which is a trail that actively misleads. Absent on the normal
+  // path, so "no override" stays indistinguishable from clean data.
+  actedById?: string;
+  actedByName?: string;
 };
 
 export type InfoChangePayload = {
@@ -44,21 +50,33 @@ export async function buildApproverChain(employeeId: string): Promise<ApprovalSt
     include: { employee: true },
   });
 
+  // Nobody approves their own request. The HR admin used to be appended to
+  // every chain including their own, so an admin requesting time off was
+  // handed a step assigned to themselves and could simply approve it — the
+  // one case where the approval engine was decorative. Same guard on the
+  // manager, for the self-managing edge case.
   const steps: ApprovalStep[] = [];
-  if (emp.manager) {
+  if (emp.manager && emp.manager.id !== emp.id) {
     steps.push({
       approverId: emp.manager.id,
       approverName: `${emp.manager.firstName} ${emp.manager.lastName}`,
       status: "PENDING",
     });
   }
-  if (adminUser?.employee && adminUser.employee.id !== emp.manager?.id) {
+  if (
+    adminUser?.employee &&
+    adminUser.employee.id !== emp.id &&
+    adminUser.employee.id !== emp.manager?.id
+  ) {
     steps.push({
       approverId: adminUser.employee.id,
       approverName: `${adminUser.employee.firstName} ${adminUser.employee.lastName}`,
       status: "PENDING",
     });
   }
+  // An empty chain still means auto-approve (see createApproval). For an admin
+  // with no manager that is the existing, deliberate "CEO" behaviour — the
+  // request is recorded and applied, but it is never dressed up as reviewed.
   return steps;
 }
 
@@ -126,7 +144,18 @@ export async function actOnApproval(
     throw new Error("Not your approval to act on");
   }
 
-  steps[idx] = { ...step, status: decision, actedAt: new Date().toISOString() };
+  // Record who ACTUALLY acted. An admin may act on anyone's step, and the step
+  // used to keep the assigned approver's name, so the trail read as though the
+  // manager had approved something they never saw.
+  const actedByOther = actor.employeeId !== step.approverId;
+  steps[idx] = {
+    ...step,
+    status: decision,
+    actedAt: new Date().toISOString(),
+    ...(actedByOther
+      ? { actedById: actor.employeeId ?? undefined, actedByName: actor.name }
+      : {}),
+  };
   const done = decision === "DENIED" || idx === steps.length - 1;
   const finalStatus = decision === "DENIED" ? "DENIED" : done ? "APPROVED" : "PENDING";
 
