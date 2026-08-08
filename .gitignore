@@ -44,3 +44,8 @@ next-env.d.ts
 
 # local embedded postgres data
 /.pgdata/
+
+# Claude Code worktrees — throwaway local checkouts, never source.
+# Scoped to worktrees ONLY: .claude/skills/ is deliberately committed
+# (the Prisma skill set), so a blanket .claude/ rule would be wrong.
+/.claude/worktrees/
