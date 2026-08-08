@@ -12,6 +12,12 @@ export type ApprovalStep = {
   approverName: string;
   status: "PENDING" | "APPROVED" | "DENIED";
   actedAt?: string;
+  // Set only when an ADMIN acted in place of the assigned approver. Without
+  // these the step still reads "Approved — Dana Whitfield" when Dana never
+  // touched it, which is a trail that actively misleads. Absent on the normal
+  // path, so "no override" stays indistinguishable from clean data.
+  actedById?: string;
+  actedByName?: string;
 };
 
 export type InfoChangePayload = {
@@ -44,21 +50,33 @@ export async function buildApproverChain(employeeId: string): Promise<ApprovalSt
     include: { employee: true },
   });
 
+  // Nobody approves their own request. The HR admin used to be appended to
+  // every chain including their own, so an admin requesting time off was
+  // handed a step assigned to themselves and could simply approve it — the
+  // one case where the approval engine was decorative. Same guard on the
+  // manager, for the self-managing edge case.
   const steps: ApprovalStep[] = [];
-  if (emp.manager) {
+  if (emp.manager && emp.manager.id !== emp.id) {
     steps.push({
       approverId: emp.manager.id,
       approverName: `${emp.manager.firstName} ${emp.manager.lastName}`,
       status: "PENDING",
     });
   }
-  if (adminUser?.employee && adminUser.employee.id !== emp.manager?.id) {
+  if (
+    adminUser?.employee &&
+    adminUser.employee.id !== emp.id &&
+    adminUser.employee.id !== emp.manager?.id
+  ) {
     steps.push({
       approverId: adminUser.employee.id,
       approverName: `${adminUser.employee.firstName} ${adminUser.employee.lastName}`,
       status: "PENDING",
     });
   }
+  // An empty chain still means auto-approve (see createApproval). For an admin
+  // with no manager that is the existing, deliberate "CEO" behaviour — the
+  // request is recorded and applied, but it is never dressed up as reviewed.
   return steps;
 }
 
@@ -126,17 +144,40 @@ export async function actOnApproval(
     throw new Error("Not your approval to act on");
   }
 
-  steps[idx] = { ...step, status: decision, actedAt: new Date().toISOString() };
+  // Record who ACTUALLY acted. An admin may act on anyone's step, and the step
+  // used to keep the assigned approver's name, so the trail read as though the
+  // manager had approved something they never saw.
+  const actedByOther = actor.employeeId !== step.approverId;
+  steps[idx] = {
+    ...step,
+    status: decision,
+    actedAt: new Date().toISOString(),
+    ...(actedByOther
+      ? { actedById: actor.employeeId ?? undefined, actedByName: actor.name }
+      : {}),
+  };
   const done = decision === "DENIED" || idx === steps.length - 1;
   const finalStatus = decision === "DENIED" ? "DENIED" : done ? "APPROVED" : "PENDING";
 
-  const updated = await db.approvalRequest.update({
-    where: { id: approvalId },
+  // Compare-and-swap, not a plain update. The status check above is a READ;
+  // between it and this write another approver can pass the very same check.
+  // That is not a freak race here: the inbox deliberately shows every pending
+  // request to admins, so a manager and an admin deciding at the same moment
+  // is the designed workflow. Both used to pass, both used to reach
+  // applyApprovalEffect, and a TIME_OFF request was debited from the ledger
+  // twice. Re-stating `status: "PENDING"` in the where clause makes the
+  // database decide the winner: the loser matches zero rows.
+  const { count } = await db.approvalRequest.updateMany({
+    where: { id: approvalId, status: "PENDING" },
     data: {
       steps: steps as unknown as Prisma.InputJsonValue,
       status: finalStatus,
       resolvedAt: done ? new Date() : null,
     },
+  });
+  if (count === 0) throw new Error("Request already resolved");
+  const updated = await db.approvalRequest.findUniqueOrThrow({
+    where: { id: approvalId },
   });
 
   await audit(actor, "ApprovalRequest", approvalId, decision, {
@@ -192,16 +233,32 @@ async function applyApprovalEffect(approvalId: string) {
         where: { id: approval.targetId },
         data: { status: "APPROVED" },
       });
-      // Debit the ledger for the approved hours
-      await db.timeOffLedgerEntry.create({
-        data: {
-          employeeId: req.employeeId,
-          policyId: req.policyId,
-          date: req.startDate,
-          amountHours: -req.totalHours,
-          kind: "USAGE",
-          note: `Approved time off ${req.startDate.toISOString().slice(0, 10)} – ${req.endDate.toISOString().slice(0, 10)}`,
-        },
+      // Debit the ledger for the approved hours.
+      //
+      // Keyed so the DATABASE refuses a second debit, not just the caller.
+      // periodKey is already the accrual idempotency key and is covered by
+      // @@unique([employeeId, policyId, periodKey]) — see materialize.ts,
+      // which relies on the same constraint. The "usage:" prefix namespaces
+      // these apart from accrual keys like "2026-P14". Balances are a plain
+      // sum over every entry, so carrying a key here changes no arithmetic.
+      //
+      // The compare-and-swap in actOnApproval should already make a duplicate
+      // impossible; this is the backstop that survives a retry, a double
+      // submit, or a future caller that forgets the invariant. Money-like
+      // ledgers get belt and braces.
+      await db.timeOffLedgerEntry.createMany({
+        data: [
+          {
+            employeeId: req.employeeId,
+            policyId: req.policyId,
+            date: req.startDate,
+            amountHours: -req.totalHours,
+            kind: "USAGE",
+            periodKey: `usage:${req.id}`,
+            note: `Approved time off ${req.startDate.toISOString().slice(0, 10)} – ${req.endDate.toISOString().slice(0, 10)}`,
+          },
+        ],
+        skipDuplicates: true,
       });
       break;
     }

@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { todayLocalISO } from "@/lib/utils";
 import { Pencil, Plus, Loader2 } from "lucide-react";
 import {
   adminUpdatePersonal,
@@ -55,6 +56,26 @@ function useSubmit() {
   return { busy, submit };
 }
 
+/**
+ * Dialog open/close wired so CLOSING RESETS THE FORM.
+ *
+ * Every one of these dialogs used to keep its state for the life of the page:
+ * save an emergency contact, reopen the dialog, and the previous values were
+ * still sitting there with an enabled Save button. One more click created a
+ * duplicate contact — or a duplicate comp row, or a duplicate job change.
+ * Cancelling was just as bad: abandoned edits reappeared next time as if they
+ * had been saved.
+ */
+function useResettableDialog<T>(makeInitial: () => T) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState<T>(makeInitial);
+  function onOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) setForm(makeInitial());
+  }
+  return { open, setOpen, form, setForm, onOpenChange };
+}
+
 function Field({
   label,
   ...props
@@ -83,12 +104,11 @@ export function EditPersonalDialog({
     zip: string;
   };
 }) {
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState(employee);
+  const { open, form, setForm, onOpenChange } = useResettableDialog(() => employee);
   const { busy, submit } = useSubmit();
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger
         render={
           <Button variant="outline" size="sm">
@@ -122,7 +142,7 @@ export function EditPersonalDialog({
             onClick={() =>
               submit(
                 () => adminUpdatePersonal({ employeeId: employee.id, ...form }),
-                () => setOpen(false),
+                () => onOpenChange(false),
               )
             }
           >
@@ -137,20 +157,22 @@ export function EditPersonalDialog({
 // ── Job change (admin) ──────────────────────────────────────────
 
 export function AddJobChangeDialog({ employeeId }: { employeeId: string }) {
-  const [open, setOpen] = useState(false);
-  const today = new Date().toISOString().slice(0, 10);
-  const [form, setForm] = useState({
-    effectiveDate: today,
+  const { open, form, setForm, onOpenChange } = useResettableDialog(() => ({
+    // todayLocalISO, not toISOString: the UTC form defaulted to TOMORROW for
+    // anyone west of Greenwich after late afternoon, and adminAddJobChange now
+    // keys off the effective date, so a wrong default silently means "does not
+    // apply yet".
+    effectiveDate: todayLocalISO(),
     title: "",
     departmentName: "Operations",
     locationName: "Portland HQ",
     employmentType: "Full-Time",
     changeReason: "Promotion",
-  });
+  }));
   const { busy, submit } = useSubmit();
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger
         render={
           <Button variant="outline" size="sm">
@@ -224,7 +246,7 @@ export function AddJobChangeDialog({ employeeId }: { employeeId: string }) {
           <Button
             disabled={busy || !form.title}
             onClick={() =>
-              submit(() => adminAddJobChange({ employeeId, ...form }), () => setOpen(false))
+              submit(() => adminAddJobChange({ employeeId, ...form }), () => onOpenChange(false))
             }
           >
             {busy && <Loader2 className="size-4 animate-spin" />} Save
@@ -238,18 +260,16 @@ export function AddJobChangeDialog({ employeeId }: { employeeId: string }) {
 // ── Compensation change (admin) ─────────────────────────────────
 
 export function AddCompChangeDialog({ employeeId }: { employeeId: string }) {
-  const [open, setOpen] = useState(false);
-  const today = new Date().toISOString().slice(0, 10);
-  const [form, setForm] = useState({
-    effectiveDate: today,
+  const { open, form, setForm, onOpenChange } = useResettableDialog(() => ({
+    effectiveDate: todayLocalISO(),
     payType: "SALARY" as "SALARY" | "HOURLY",
     amountDollars: "",
     changeReason: "Merit Increase",
-  });
+  }));
   const { busy, submit } = useSubmit();
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger
         render={
           <Button variant="outline" size="sm">
@@ -308,7 +328,7 @@ export function AddCompChangeDialog({ employeeId }: { employeeId: string }) {
                     amountDollars: Number(form.amountDollars),
                     changeReason: form.changeReason,
                   }),
-                () => setOpen(false),
+                () => onOpenChange(false),
               )
             }
           >
@@ -323,12 +343,15 @@ export function AddCompChangeDialog({ employeeId }: { employeeId: string }) {
 // ── Emergency contact (self or admin) ───────────────────────────
 
 export function AddContactDialog({ employeeId }: { employeeId: string }) {
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", relationship: "", phone: "" });
+  const { open, form, setForm, onOpenChange } = useResettableDialog(() => ({
+    name: "",
+    relationship: "",
+    phone: "",
+  }));
   const { busy, submit } = useSubmit();
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger
         render={
           <Button variant="outline" size="sm">
@@ -354,7 +377,7 @@ export function AddContactDialog({ employeeId }: { employeeId: string }) {
             onClick={() =>
               submit(
                 () => addEmergencyContact({ employeeId, ...form }),
-                () => setOpen(false),
+                () => onOpenChange(false),
               )
             }
           >

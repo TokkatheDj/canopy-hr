@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { todayLocalISO } from "@/lib/utils";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -93,7 +94,7 @@ export function ClockButtons({
 export function AddEntryDialog() {
   const [open, setOpen] = useState(false);
   const { busy, run } = useAction();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalISO();
   const [form, setForm] = useState({
     date: today,
     hours: "8",

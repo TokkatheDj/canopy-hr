@@ -178,20 +178,51 @@ export async function adminAddJobChange(
   try {
     const user = require_(await currentUser() ?? undefined, "people.edit");
     const data = jobChangeSchema.parse(input);
-    await db.jobInfo.create({
-      data: { ...data, effectiveDate: new Date(data.effectiveDate + "T00:00:00Z") },
+    const effectiveDate = new Date(data.effectiveDate + "T00:00:00Z");
+
+    // Resolve the names BEFORE writing anything. Prisma silently omits a field
+    // whose value is `undefined`, so an unrecognised name used to leave
+    // JobInfo.departmentName and Employee.departmentId disagreeing forever,
+    // with no error raised anywhere. Fail loudly instead.
+    const [dept, loc] = await Promise.all([
+      db.department.findUnique({ where: { name: data.departmentName } }),
+      db.location.findUnique({ where: { name: data.locationName } }),
+    ]);
+    if (!dept) return { ok: false, error: `Unknown department: ${data.departmentName}` };
+    if (!loc) return { ok: false, error: `Unknown location: ${data.locationName}` };
+
+    const created = await db.jobInfo.create({ data: { ...data, effectiveDate } });
+
+    // The denormalized refs on Employee describe the job in force TODAY, so
+    // sync them only when this record is the one in force. Previously any job
+    // change rewrote them immediately: a transfer dated next month moved the
+    // person early (directory said one thing, Job tab another), and a
+    // back-dated correction overwrote current data with historical values.
+    const now = new Date();
+    const supersededByLaterChange = await db.jobInfo.findFirst({
+      where: {
+        employeeId: data.employeeId,
+        id: { not: created.id },
+        effectiveDate: { gt: effectiveDate, lte: now },
+      },
+      select: { id: true },
     });
-    // keep denormalized department/location refs in sync when effective now
-    const dept = await db.department.findUnique({ where: { name: data.departmentName } });
-    const loc = await db.location.findUnique({ where: { name: data.locationName } });
-    await db.employee.update({
-      where: { id: data.employeeId },
-      data: { departmentId: dept?.id, locationId: loc?.id },
-    });
+    const inForceNow = effectiveDate <= now && !supersededByLaterChange;
+
+    if (inForceNow) {
+      await db.employee.update({
+        where: { id: data.employeeId },
+        data: { departmentId: dept.id, locationId: loc.id },
+      });
+    }
+
     await audit(user, "Employee", data.employeeId, "JOB_CHANGE", {
       title: data.title,
       effectiveDate: data.effectiveDate,
       reason: data.changeReason,
+      // Recorded because "why didn't the directory change?" is otherwise
+      // indistinguishable from a bug.
+      appliedToProfileNow: inForceNow,
     });
     revalidatePath(`/people/${data.employeeId}`);
     return { ok: true };
@@ -352,10 +383,65 @@ export async function setCustomFieldValue(
     if (user.role !== "ADMIN" && user.employeeId !== employeeId) {
       throw new AuthzError("custom field");
     }
+
+    // None of this was checked before. Server Actions are public HTTP
+    // endpoints, so "the UI only sends valid values" is not a constraint:
+    // any authenticated user could write an unbounded string against any
+    // definition id, including one belonging to a different entity, and
+    // bypass a SELECT's option list entirely.
+    const def = await db.customFieldDefinition.findUnique({
+      where: { id: definitionId },
+    });
+    if (!def || def.entity !== "EMPLOYEE") return { ok: false, error: "Unknown field" };
+
+    const exists = await db.employee.findUnique({
+      where: { id: employeeId },
+      select: { id: true },
+    });
+    if (!exists) return { ok: false, error: "Unknown employee" };
+
+    const clean = value.trim();
+    switch (def.type) {
+      case "SELECT": {
+        const options = (def.options as string[] | null) ?? [];
+        if (clean !== "" && !options.includes(clean)) {
+          return { ok: false, error: `${def.label} must be one of: ${options.join(", ")}` };
+        }
+        break;
+      }
+      case "NUMBER":
+        if (clean !== "" && !Number.isFinite(Number(clean))) {
+          return { ok: false, error: `${def.label} must be a number` };
+        }
+        break;
+      case "DATE":
+        if (clean !== "" && Number.isNaN(Date.parse(clean))) {
+          return { ok: false, error: `${def.label} must be a valid date` };
+        }
+        break;
+      case "CHECKBOX":
+        if (clean !== "true" && clean !== "false") {
+          return { ok: false, error: `${def.label} must be true or false` };
+        }
+        break;
+      case "TEXT":
+        if (clean.length > 500) {
+          return { ok: false, error: `${def.label} must be 500 characters or fewer` };
+        }
+        break;
+    }
+
     await db.customFieldValue.upsert({
       where: { definitionId_employeeId: { definitionId, employeeId } },
-      create: { definitionId, employeeId, value },
-      update: { value },
+      create: { definitionId, employeeId, value: clean },
+      update: { value: clean },
+    });
+    // This was the only mutating action in the file that recorded nothing —
+    // custom fields can hold anything HR chooses to put in them, so an
+    // unlogged write here is exactly the one you would want to look up later.
+    await audit(user, "Employee", employeeId, "CUSTOM_FIELD_SET", {
+      field: def.label,
+      value: clean,
     });
     revalidatePath(`/people/${employeeId}`);
     revalidatePath("/my-info");
