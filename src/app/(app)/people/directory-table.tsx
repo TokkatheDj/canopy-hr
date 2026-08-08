@@ -33,7 +33,14 @@ const STATUS_STYLE: Record<DirectoryRow["status"], string> = {
 
 const columns: ColumnDef<DirectoryRow>[] = [
   {
-    accessorKey: "name",
+    id: "name",
+    // The cell renders the work email, but the global filter only ever sees
+    // ACCESSOR values — and there was no accessor for workEmail, so searching
+    // the directory by email always returned "No results" against an email
+    // sitting visibly on screen. Folding it into this column's accessor makes
+    // it searchable without adding a redundant column. Name comes first, so
+    // sorting is still by name.
+    accessorFn: (r) => `${r.name} ${r.workEmail}`,
     header: "Name",
     cell: ({ row }) => (
       <div className="flex items-center gap-3">

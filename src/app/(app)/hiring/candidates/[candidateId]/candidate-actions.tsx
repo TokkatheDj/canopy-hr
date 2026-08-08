@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toLocalISODate } from "@/lib/utils";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -128,7 +129,7 @@ export function OfferDialog({
     title: defaultTitle,
     payType: "SALARY" as "SALARY" | "HOURLY",
     amountDollars: "",
-    startDate: nextMonth.toISOString().slice(0, 10),
+    startDate: toLocalISODate(nextMonth),
   });
 
   return (
