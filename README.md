@@ -25,6 +25,11 @@ There's also a **public careers page** at `/careers` — submit an application a
 | ![Payroll](docs/screenshots/payroll.png) | ![Pipeline](docs/screenshots/pipeline.png) |
 | ![Pay stub](docs/screenshots/paystub.png) | ![Reports](docs/screenshots/reports.png) |
 
+## How it compares
+
+See **[Canopy HR vs BambooHR vs Rippling](docs/COMPARISON.md)** for a
+feature-by-feature comparison against the two platforms it's modeled on.
+
 ## Feature coverage
 
 | Module | Status |

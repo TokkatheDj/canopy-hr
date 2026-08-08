@@ -7,13 +7,14 @@ import { formatPay } from "@/lib/history";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, BadgeCheck } from "lucide-react";
+import { ArrowLeft, BadgeCheck, FileText } from "lucide-react";
 import {
   CandidateStageSelect,
   CandidateNoteForm,
   OfferDialog,
   RejectButton,
   MarkHiredButton,
+  CopyOfferLinkButton,
 } from "./candidate-actions";
 
 export const metadata = { title: "Candidate" };
@@ -33,6 +34,7 @@ const EVENT_DOT: Record<string, string> = {
   STAGE_CHANGE: "bg-emerald-400",
   NOTE: "bg-neutral-400",
   OFFER_SENT: "bg-amber-400",
+  OFFER_SIGNED: "bg-emerald-500",
   HIRED: "bg-emerald-600",
   REJECTED: "bg-red-400",
 };
@@ -116,6 +118,22 @@ export default async function CandidatePage({
               <span className="text-muted-foreground">Phone: </span>
               {candidate.phone ?? "—"}
             </div>
+            <div>
+              <span className="text-muted-foreground">Resume: </span>
+              {candidate.resumeName ? (
+                <a
+                  href={`/api/resumes/${candidate.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-emerald-700 hover:underline dark:text-emerald-400"
+                >
+                  <FileText className="size-3.5" />
+                  {candidate.resumeName}
+                </a>
+              ) : (
+                "—"
+              )}
+            </div>
             {candidate.hiredEmployee && (
               <div>
                 <span className="text-muted-foreground">Employee record: </span>
@@ -161,8 +179,16 @@ export default async function CandidatePage({
           <CardHeader>
             <CardTitle className="text-base">
               Offer letter
-              {candidate.offer.acceptedAt && (
+              {candidate.offer.signedAt ? (
+                <Badge className="ml-2 bg-emerald-100 text-emerald-800">
+                  signed by {candidate.offer.signedName} · {fmtDate(candidate.offer.signedAt)}
+                </Badge>
+              ) : candidate.offer.acceptedAt ? (
                 <Badge className="ml-2 bg-emerald-100 text-emerald-800">accepted</Badge>
+              ) : (
+                <Badge variant="outline" className="ml-2 text-amber-700">
+                  awaiting signature
+                </Badge>
               )}
             </CardTitle>
           </CardHeader>
@@ -184,6 +210,12 @@ export default async function CandidatePage({
             <div className="whitespace-pre-line rounded-lg border bg-muted/40 p-4 text-sm leading-relaxed">
               {candidate.offer.body}
             </div>
+            {candidate.offer.signToken && !candidate.offer.signedAt && (
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                Share the signing link with the candidate:
+                <CopyOfferLinkButton token={candidate.offer.signToken} />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

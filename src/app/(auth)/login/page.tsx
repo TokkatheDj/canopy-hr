@@ -143,6 +143,11 @@ function LoginInner() {
           >
             {busy === "form" ? <Loader2 className="size-4 animate-spin" /> : "Sign in"}
           </Button>
+          <p className="text-xs text-muted-foreground">
+            There&apos;s no self-signup — like BambooHR, accounts are created by
+            HR. Admins add people under People → Add employee (or by hiring a
+            candidate), which generates their login and temporary password.
+          </p>
         </form>
 
         <p className="text-center text-xs text-muted-foreground">

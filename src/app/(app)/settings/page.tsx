@@ -20,6 +20,8 @@ import {
   AddHolidayForm,
   DeleteHolidayButton,
 } from "./settings-client";
+import { TrainingSettings } from "./training-settings";
+import { CoreValuesSettings } from "./core-values-settings";
 import { Check, Minus } from "lucide-react";
 
 export const metadata = { title: "Settings" };
@@ -36,6 +38,8 @@ const PERMISSIONS_MATRIX: Array<{ area: string; admin: string; manager: string; 
   { area: "Benefits administration", admin: "full", manager: "own elections", employee: "own elections" },
   { area: "Performance cycles", admin: "full", manager: "team reviews", employee: "self + peer" },
   { area: "Survey results", admin: "full", manager: "—", employee: "respond only" },
+  { area: "Training courses", admin: "full", manager: "own completion", employee: "own completion" },
+  { area: "Recognition", admin: "full", manager: "give + receive", employee: "give + receive" },
   { area: "Reports", admin: "full", manager: "view", employee: "—" },
   { area: "Files & signatures", admin: "full", manager: "view + sign", employee: "view + sign" },
   { area: "Settings & audit log", admin: "full", manager: "—", employee: "—" },
@@ -54,12 +58,16 @@ export default async function SettingsPage() {
   const user = await currentUser();
   if (!user || !can(user, "settings.manage")) redirect("/home");
 
-  const [settings, fields, holidays, auditRows] = await Promise.all([
-    db.companySettings.findUnique({ where: { id: "singleton" } }),
-    db.customFieldDefinition.findMany({ orderBy: { order: "asc" } }),
-    db.holiday.findMany({ orderBy: { date: "asc" } }),
-    db.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
-  ]);
+  const [settings, fields, holidays, auditRows, trainingCategories, trainingCourses, coreValues] =
+    await Promise.all([
+      db.companySettings.findUnique({ where: { id: "singleton" } }),
+      db.customFieldDefinition.findMany({ orderBy: { order: "asc" } }),
+      db.holiday.findMany({ orderBy: { date: "asc" } }),
+      db.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
+      db.trainingCategory.findMany({ orderBy: { order: "asc" } }),
+      db.trainingCourse.findMany({ orderBy: { name: "asc" } }),
+      db.coreValue.findMany({ orderBy: { name: "asc" } }),
+    ]);
 
   const flags = (settings?.flags as { managersSeeCompensation?: boolean } | null) ?? {};
 
@@ -78,6 +86,8 @@ export default async function SettingsPage() {
           <TabsTrigger value="access">Access levels</TabsTrigger>
           <TabsTrigger value="fields">Custom fields</TabsTrigger>
           <TabsTrigger value="holidays">Holidays</TabsTrigger>
+          <TabsTrigger value="training">Training</TabsTrigger>
+          <TabsTrigger value="values">Core values</TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>
         </TabsList>
 
@@ -97,6 +107,35 @@ export default async function SettingsPage() {
               />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="training" className="pt-2">
+          <TrainingSettings
+            categories={trainingCategories.map((c) => ({
+              id: c.id,
+              name: c.name,
+              order: c.order,
+            }))}
+            courses={trainingCourses.map((c) => ({
+              id: c.id,
+              name: c.name,
+              categoryId: c.categoryId,
+              required: c.required,
+              frequencyMonths: c.frequencyMonths,
+              dueDaysFromHire: c.dueDaysFromHire,
+            }))}
+          />
+        </TabsContent>
+
+        <TabsContent value="values" className="pt-2">
+          <CoreValuesSettings
+            values={coreValues.map((v) => ({
+              id: v.id,
+              name: v.name,
+              description: v.description,
+              icon: v.icon,
+            }))}
+          />
         </TabsContent>
 
         <TabsContent value="access" className="pt-2">
