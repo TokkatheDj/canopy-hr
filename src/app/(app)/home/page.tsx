@@ -252,6 +252,14 @@ export default async function HomePage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Palmtree className="size-4 text-emerald-600" /> Who&apos;s out today
+                {(user?.role === "ADMIN" || user?.isManager) && (
+                  <Link
+                    href="/coverage"
+                    className="ml-auto text-sm font-normal text-emerald-700 hover:underline dark:text-emerald-400"
+                  >
+                    Need coverage? &rarr;
+                  </Link>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>

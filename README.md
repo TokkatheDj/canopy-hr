@@ -41,6 +41,7 @@ feature-by-feature comparison against the two platforms it's modeled on.
 | Onboarding & offboarding checklists (templated, auto-created on hire) | ✅ |
 | Time off: accrual ledger, balances, request/approve, team calendar, holidays | ✅ |
 | Timesheets: clock in/out, manual entries, weekly overtime, approval | ✅ |
+| Shift coverage blasts *(simulated email)*: last-minute call-off → email blast → one-tap "I can cover it" → assign | ✅ |
 | Payroll *(simulated)*: draft → approve → paid runs, printable pay stubs | ✅ |
 | Benefits *(simulated)*: plan catalog, open-enrollment elections feeding payroll | ✅ |
 | Performance: review cycles (self/manager/peer), goals with check-ins, 1:1s | ✅ |
@@ -53,7 +54,7 @@ feature-by-feature comparison against the two platforms it's modeled on.
 
 ## What's simulated — and why
 
-This is a demo, so anything that would touch the real world is simulated deliberately: payroll taxes use illustrative flat rates (12% federal, 5% state, 6.2% Social Security, 1.45% Medicare) rather than real withholding tables; no money moves; e-signatures are typed-name capture; and notifications are in-app rather than email. Everything else — accrual math, overtime splitting, gross-to-net computation, approval chains — is real, running logic with unit tests.
+This is a demo, so anything that would touch the real world is simulated deliberately: payroll taxes use illustrative flat rates (12% federal, 5% state, 6.2% Social Security, 1.45% Medicare) rather than real withholding tables; no money moves; e-signatures are typed-name capture; and notifications are in-app rather than email — coverage-blast "emails" are composed and recorded for real (you can read them in the app) but delivered as in-app notifications, since the demo employees' addresses are fictional. Everything else — accrual math, overtime splitting, gross-to-net computation, approval chains — is real, running logic with unit tests.
 
 ## Architecture notes
 

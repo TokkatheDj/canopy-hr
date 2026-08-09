@@ -97,6 +97,10 @@ model Employee {
   trainingRecords      TrainingRecord[]
   recognitionsGiven    Recognition[]          @relation("RecognitionGiven")
   recognitionsReceived RecognitionRecipient[] @relation("RecognitionReceived")
+  coverageCreated      CoverageRequest[]      @relation("CoverageCreatedBy")
+  coverageAbsences     CoverageRequest[]      @relation("CoverageAbsent")
+  coverageFilled       CoverageRequest[]      @relation("CoverageFilledBy")
+  coverageInvites      CoverageRecipient[]    @relation("CoverageInvited")
 
   @@index([status])
   @@index([managerId])
@@ -110,11 +114,12 @@ model Department {
 }
 
 model Location {
-  id        String     @id @default(cuid())
-  name      String     @unique
-  city      String
-  state     String
-  employees Employee[]
+  id               String            @id @default(cuid())
+  name             String            @unique
+  city             String
+  state            String
+  employees        Employee[]
+  coverageRequests CoverageRequest[]
 }
 
 model EmergencyContact {
@@ -822,6 +827,62 @@ model RecognitionRecipient {
   employeeId    String
 
   @@unique([recognitionId, employeeId])
+  @@index([employeeId])
+}
+
+// ── Shift coverage blasts ───────────────────────────────────────
+
+enum CoverageStatus {
+  OPEN
+  FILLED
+  CANCELLED
+}
+
+enum CoverageResponse {
+  AVAILABLE
+  DECLINED
+}
+
+model CoverageRequest {
+  id         String         @id @default(cuid())
+  date       DateTime
+  startTime  String // "6:00 AM"
+  endTime    String
+  location   Location?      @relation(fields: [locationId], references: [id])
+  locationId String?
+  role       String? // e.g. "Day Porter"
+  notes      String?
+  status     CoverageStatus @default(OPEN)
+
+  // simulated email snapshot, same for every recipient
+  emailSubject String
+  emailBody    String
+
+  createdBy   Employee  @relation("CoverageCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  createdById String
+  // who called off (optional)
+  absent      Employee? @relation("CoverageAbsent", fields: [absentId], references: [id])
+  absentId    String?
+  filledBy    Employee? @relation("CoverageFilledBy", fields: [filledById], references: [id])
+  filledById  String?
+
+  createdAt  DateTime            @default(now())
+  recipients CoverageRecipient[]
+
+  @@index([status, date])
+}
+
+model CoverageRecipient {
+  id          String            @id @default(cuid())
+  request     CoverageRequest   @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId   String
+  employee    Employee          @relation("CoverageInvited", fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId  String
+  sentAt      DateTime          @default(now())
+  response    CoverageResponse?
+  respondedAt DateTime?
+
+  @@unique([requestId, employeeId])
   @@index([employeeId])
 }
 

@@ -17,6 +17,7 @@ import {
   GraduationCap,
   Award,
   MessageCircleQuestion,
+  Megaphone,
   type LucideIcon,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/authz";
@@ -40,6 +41,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Onboarding", href: "/onboarding", icon: ClipboardCheck, show: adminOnly },
   { label: "Time Off", href: "/time-off", icon: Palmtree, show: everyone },
   { label: "Timesheets", href: "/timesheets", icon: Clock, show: everyone },
+  { label: "Coverage", href: "/coverage", icon: Megaphone, show: everyone },
   { label: "Payroll", href: "/payroll", icon: Banknote, show: adminOnly },
   { label: "Benefits", href: "/benefits", icon: HeartPulse, show: everyone },
   { label: "Performance", href: "/performance", icon: Target, show: everyone },
