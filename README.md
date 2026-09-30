@@ -26,6 +26,7 @@ There's also a **public careers page** at `/careers` — submit an application a
 | ![Dashboard](docs/screenshots/dashboard.png) | ![Directory](docs/screenshots/directory.png) |
 | ![Payroll](docs/screenshots/payroll.png) | ![Pipeline](docs/screenshots/pipeline.png) |
 | ![Pay stub](docs/screenshots/paystub.png) | ![Reports](docs/screenshots/reports.png) |
+| ![Reports in dark mode](docs/screenshots/reports-dark.png) | ![Login with one-click demo roles](docs/screenshots/login.png) |
 
 ## How it compares
 
