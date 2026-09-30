@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { createElement, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +49,11 @@ const VALUE_ICONS: Record<string, LucideIcon> = {
 
 function valueIcon(name: string | null): LucideIcon {
   return (name && VALUE_ICONS[name]) || Star;
+}
+
+// A stable component, so React never sees a "new" icon component per render.
+function ValueIcon({ name, className }: { name: string | null; className?: string }) {
+  return createElement(valueIcon(name), { className });
 }
 
 const POINT_OPTIONS = [5, 10, 15, 20, 25];
@@ -113,7 +118,6 @@ function PersonChip({ person }: { person: Person }) {
 }
 
 function PostCard({ post }: { post: RecognitionPost }) {
-  const Icon = post.coreValue ? valueIcon(post.coreValue.icon) : null;
   return (
     <Card>
       <CardContent className="space-y-3 pt-2">
@@ -129,9 +133,9 @@ function PostCard({ post }: { post: RecognitionPost }) {
             <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
               +{post.points}
             </Badge>
-            {post.coreValue && Icon && (
+            {post.coreValue && (
               <Badge variant="secondary">
-                <Icon /> {post.coreValue.name}
+                <ValueIcon name={post.coreValue.icon} /> {post.coreValue.name}
               </Badge>
             )}
             <span className="text-xs text-muted-foreground">{fmtDate(post.createdAt)}</span>
@@ -256,7 +260,6 @@ function GiveRecognitionDialog({
               <Label>Core value (optional)</Label>
               <div className="flex flex-wrap gap-2">
                 {coreValues.map((v) => {
-                  const Icon = valueIcon(v.icon);
                   return (
                     <Button
                       key={v.id}
@@ -267,7 +270,7 @@ function GiveRecognitionDialog({
                         setCoreValueId((prev) => (prev === v.id ? null : v.id))
                       }
                     >
-                      <Icon className="size-3.5" /> {v.name}
+                      <ValueIcon name={v.icon} className="size-3.5" /> {v.name}
                     </Button>
                   );
                 })}

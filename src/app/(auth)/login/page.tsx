@@ -63,7 +63,7 @@ function LoginInner() {
         <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
             <Leaf className="size-8" />
-            <span className="text-3xl font-bold tracking-tight">Canopy HR</span>
+            <h1 className="text-3xl font-bold tracking-tight">Canopy HR</h1>
           </div>
           <p className="text-muted-foreground text-sm">
             The complete HR platform demo — pick a role to explore
@@ -74,9 +74,16 @@ function LoginInner() {
           {DEMO_ACCOUNTS.map((acct) => (
             <Card
               key={acct.email}
-              className="cursor-pointer transition hover:border-emerald-500 hover:shadow-md py-0"
-              onClick={() => doLogin(acct.email, DEMO_PASSWORD, acct.email)}
+              className="transition hover:shadow-md hover:ring-emerald-500 has-[button:focus-visible]:ring-2 has-[button:focus-visible]:ring-emerald-600 py-0"
             >
+              {/* A real button, so the demo roles work from the keyboard and
+                  are announced to screen readers — a clickable card is neither. */}
+              <button
+                type="button"
+                className="w-full cursor-pointer text-left outline-none disabled:cursor-wait"
+                disabled={busy !== null}
+                onClick={() => doLogin(acct.email, DEMO_PASSWORD, acct.email)}
+              >
               <CardContent className="flex items-center gap-4 p-4">
                 <div className="rounded-full bg-emerald-100 dark:bg-emerald-900 p-2.5 text-emerald-700 dark:text-emerald-300">
                   {busy === acct.email ? (
@@ -92,6 +99,7 @@ function LoginInner() {
                   </div>
                 </div>
               </CardContent>
+              </button>
             </Card>
           ))}
         </div>
@@ -135,7 +143,7 @@ function LoginInner() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <Button
             type="submit"
             className="w-full bg-emerald-700 hover:bg-emerald-800"

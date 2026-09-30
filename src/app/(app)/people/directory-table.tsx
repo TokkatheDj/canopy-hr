@@ -103,7 +103,7 @@ export function DirectoryTable({ rows }: { rows: DirectoryRow[] }) {
       toolbar={
         <>
           <Select value={dept} onValueChange={(v) => setDept(v ?? "all")}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-40" aria-label="Department">
               <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent>
@@ -116,7 +116,7 @@ export function DirectoryTable({ rows }: { rows: DirectoryRow[] }) {
             </SelectContent>
           </Select>
           <Select value={status} onValueChange={(v) => setStatus(v ?? "current")}>
-            <SelectTrigger className="w-36">
+            <SelectTrigger className="w-36" aria-label="Status">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>

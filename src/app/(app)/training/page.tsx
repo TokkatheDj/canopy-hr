@@ -184,7 +184,7 @@ export default async function TrainingPage() {
                   <TableHead>Required</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Completed / Due</TableHead>
-                  <TableHead />
+                  <TableHead><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

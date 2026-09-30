@@ -182,7 +182,7 @@ export default async function PerformancePage() {
                   </Badge>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Progress value={g.progressPct} className="h-2" />
+                  <Progress value={g.progressPct} className="h-2" aria-label={`${g.title} progress`} />
                   <span className="text-xs text-muted-foreground">{g.progressPct}%</span>
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">

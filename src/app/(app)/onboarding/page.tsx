@@ -99,7 +99,7 @@ export default async function OnboardingPage() {
                   </Badge>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Progress value={pct} className="h-2" />
+                  <Progress value={pct} className="h-2" aria-label={`${c.employee.firstName} ${c.employee.lastName} checklist progress`} />
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
                     {done}/{c.tasks.length}
                   </span>
@@ -109,7 +109,7 @@ export default async function OnboardingPage() {
                 <ul className="space-y-2">
                   {c.tasks.map((t) => (
                     <li key={t.id} className="flex items-start gap-2 text-sm">
-                      <TaskCheckbox taskId={t.id} checked={Boolean(t.completedAt)} />
+                      <TaskCheckbox taskId={t.id} label={t.title} checked={Boolean(t.completedAt)} />
                       <div className={t.completedAt ? "text-muted-foreground line-through" : ""}>
                         {t.title}
                         <span className="ml-2 text-xs text-muted-foreground no-underline">
