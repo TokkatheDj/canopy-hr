@@ -53,6 +53,7 @@ feature-by-feature comparison against the two platforms it's modeled on.
 | Settings: company profile, permissions matrix, custom fields, holidays, audit log | ✅ |
 | Role-based access (Admin / Manager / Employee), enforced server-side | ✅ |
 | Mobile-responsive throughout (bottom nav on small screens) | ✅ |
+| Light and dark themes — follows the device, with a switch in the top bar | ✅ |
 
 ## What's simulated — and why
 
@@ -90,7 +91,7 @@ Next, in order:
 4. **The rest of the parity backlog:** company branding (logo and colours), candidate ratings and a talent pool, configurable hiring statuses and approval chains, pay grades and bands, and scheduled eNPS surveys.
 5. **Major upgrades held back on purpose:** TanStack Table 9, ESLint 10, TypeScript 7 and Prisma 8 each change enough to deserve their own pass.
 
-**Quality checks:** every push runs lint, the unit tests and a production build (see the badge above). An automated accessibility scan (axe-core) over every page, for all three roles, reports no violations.
+**Quality checks:** every push runs lint, the unit tests and a production build (see the badge above). An automated accessibility scan (axe-core) over every page, for all three roles, in both light and dark themes, reports no violations.
 
 ## Run it locally
 

@@ -146,7 +146,7 @@ function LoginInner() {
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <Button
             type="submit"
-            className="w-full bg-emerald-700 hover:bg-emerald-800"
+            className="w-full bg-emerald-700 text-white hover:bg-emerald-800"
             disabled={busy !== null}
           >
             {busy === "form" ? <Loader2 className="size-4 animate-spin" /> : "Sign in"}

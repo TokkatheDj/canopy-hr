@@ -205,7 +205,7 @@ function RequestCard({
             </span>
           )}
           {item.status === "FILLED" && item.filledByName && (
-            <span className="font-medium text-emerald-700">
+            <span className="font-medium text-emerald-700 dark:text-emerald-400">
               Covered by {item.filledByName}
             </span>
           )}

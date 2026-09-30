@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Bell, LogOut, UserRound, Loader2, ShieldCheck, Users, UserRoundCog } from "lucide-react";
 import type { SessionUser } from "@/lib/authz";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 // Demo-only quick role switcher (same shared accounts as the login page)
 const DEMO_ROLES = [
@@ -58,7 +59,7 @@ export function AppTopbar({
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b bg-background/95 px-4 backdrop-blur">
-      <div className="flex items-center gap-2 md:hidden text-emerald-700 font-bold">
+      <div className="flex items-center gap-2 md:hidden text-emerald-700 dark:text-emerald-400 font-bold">
         Canopy HR
       </div>
       <div className="hidden md:block" />
@@ -69,6 +70,7 @@ export function AppTopbar({
         >
           {user.role.toLowerCase()}
         </Badge>
+        <ThemeToggle />
         <Button
           variant="ghost"
           size="icon"
