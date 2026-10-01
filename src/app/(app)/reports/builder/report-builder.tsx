@@ -139,7 +139,7 @@ export function ReportBuilder({
                   ]}
                   onValueChange={(v) => v && setDept(String(v))}
                 >
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="Department" className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={ALL}>All departments</SelectItem>
                     {departments.map((d) => (
@@ -158,7 +158,7 @@ export function ReportBuilder({
                   ]}
                   onValueChange={(v) => v && setLoc(String(v))}
                 >
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="Location" className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={ALL}>All locations</SelectItem>
                     {locations.map((l) => (
@@ -179,7 +179,7 @@ export function ReportBuilder({
                   ]}
                   onValueChange={(v) => v && setStatus(String(v))}
                 >
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="Status" className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={ALL}>Any status</SelectItem>
                     <SelectItem value="ACTIVE">Active</SelectItem>
@@ -196,7 +196,7 @@ export function ReportBuilder({
                 items={GROUP_ITEMS}
                 onValueChange={(v) => setGroupBy(v === null ? "" : String(v))}
               >
-                <SelectTrigger className="w-full sm:w-72"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label="Grouping" className="w-full sm:w-72"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {GROUP_ITEMS.map((g) => (
                     <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>

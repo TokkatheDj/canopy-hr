@@ -1,5 +1,7 @@
 # 🌿 Canopy HR
 
+[![CI](https://github.com/TokkatheDj/canopy-hr/actions/workflows/ci.yml/badge.svg)](https://github.com/TokkatheDj/canopy-hr/actions/workflows/ci.yml)
+
 **A full-featured HR platform** — people records, hiring, onboarding, time off, timesheets, payroll, benefits, performance, surveys, and reporting — built as a complete, working demonstration of a modern HRIS.
 
 > **Live demo:** https://canopy-hr.vercel.app
@@ -24,6 +26,7 @@ There's also a **public careers page** at `/careers` — submit an application a
 | ![Dashboard](docs/screenshots/dashboard.png) | ![Directory](docs/screenshots/directory.png) |
 | ![Payroll](docs/screenshots/payroll.png) | ![Pipeline](docs/screenshots/pipeline.png) |
 | ![Pay stub](docs/screenshots/paystub.png) | ![Reports](docs/screenshots/reports.png) |
+| ![Reports in dark mode](docs/screenshots/reports-dark.png) | ![Login with one-click demo roles](docs/screenshots/login.png) |
 
 ## How it compares
 
@@ -41,6 +44,7 @@ feature-by-feature comparison against the two platforms it's modeled on.
 | Onboarding & offboarding checklists (templated, auto-created on hire) | ✅ |
 | Time off: accrual ledger, balances, request/approve, team calendar, holidays | ✅ |
 | Timesheets: clock in/out, manual entries, weekly overtime, approval | ✅ |
+| Shift coverage blasts *(simulated email)*: last-minute call-off → email blast → one-tap "I can cover it" → assign | ✅ |
 | Payroll *(simulated)*: draft → approve → paid runs, printable pay stubs | ✅ |
 | Benefits *(simulated)*: plan catalog, open-enrollment elections feeding payroll | ✅ |
 | Performance: review cycles (self/manager/peer), goals with check-ins, 1:1s | ✅ |
@@ -50,10 +54,11 @@ feature-by-feature comparison against the two platforms it's modeled on.
 | Settings: company profile, permissions matrix, custom fields, holidays, audit log | ✅ |
 | Role-based access (Admin / Manager / Employee), enforced server-side | ✅ |
 | Mobile-responsive throughout (bottom nav on small screens) | ✅ |
+| Light and dark themes — follows the device, with a switch in the top bar | ✅ |
 
 ## What's simulated — and why
 
-This is a demo, so anything that would touch the real world is simulated deliberately: payroll taxes use illustrative flat rates (12% federal, 5% state, 6.2% Social Security, 1.45% Medicare) rather than real withholding tables; no money moves; e-signatures are typed-name capture; and notifications are in-app rather than email. Everything else — accrual math, overtime splitting, gross-to-net computation, approval chains — is real, running logic with unit tests.
+This is a demo, so anything that would touch the real world is simulated deliberately: payroll taxes use illustrative flat rates (12% federal, 5% state, 6.2% Social Security, 1.45% Medicare) rather than real withholding tables; no money moves; e-signatures are typed-name capture; and notifications are in-app rather than email — coverage-blast "emails" are composed and recorded for real (you can read them in the app) but delivered as in-app notifications, since the demo employees' addresses are fictional. Everything else — accrual math, overtime splitting, gross-to-net computation, approval chains — is real, running logic with unit tests.
 
 ## Architecture notes
 
@@ -68,6 +73,26 @@ Three design decisions worth calling out:
 Also: RBAC is enforced in the server layer (`src/lib/authz.ts` — every Server Action guards itself; UI hiding is cosmetic), every mutation writes an `AuditLog` row, pay stub lines are snapshotted JSON so approved history never changes, and survey responses are anonymous *by construction* (the response row has no employee reference; participation is tracked in a separate table).
 
 The full domain model (~44 models) lives in [`prisma/schema.prisma`](prisma/schema.prisma).
+
+## Trade-offs, and what I'd do next
+
+Choices that were right for a demo but would change for real customers:
+
+- **Real PostgreSQL in development, not an in-process one.** `npm run db:dev` runs embedded-postgres rather than Prisma's PGlite dev server, because PGlite crashed on the multi-include joins the profile and reports pages rely on. Dev and production run the same engine.
+- **JWT sessions.** Stateless and cheap to host, but a session outlives a re-seed: after the demo data is reset, an old token can point at an employee id that no longer exists, and actions fail with "no employee record" until you sign in again. A real deployment would use database sessions or rotate on data resets.
+- **Resumes live in the database.** Uploaded files are stored as bytes on the candidate row and served through an authorized route. Fine for a handful of small PDFs; production would put them in object storage with signed URLs.
+- **Deploys are manual.** Vercel's git deploys are turned off (`vercel.json`) so a push never ships by accident; CI checks every push instead.
+- **Pages read live data.** Every data page renders per request, including the public careers page, so a new opening shows up as soon as it's posted.
+
+Next, in order:
+
+1. **Browser tests in CI.** The engine logic has unit tests; the flows (request time off → manager approves → balance drops) are verified by hand and with ad-hoc Playwright runs. Those runs belong in CI against a throwaway database.
+2. **Real email delivery** for coverage blasts and approvals, behind a feature flag so the demo keeps working with fictional addresses.
+3. **Real withholding tables** in place of the illustrative flat tax rates — the gross-to-net engine is already isolated in one module, so this is a data change more than a code change.
+4. **The rest of the parity backlog:** company branding (logo and colours), candidate ratings and a talent pool, configurable hiring statuses and approval chains, pay grades and bands, and scheduled eNPS surveys.
+5. **Major upgrades held back on purpose:** TanStack Table 9, ESLint 10, TypeScript 7 and Prisma 8 each change enough to deserve their own pass.
+
+**Quality checks:** every push runs lint, the unit tests and a production build (see the badge above). An automated accessibility scan (axe-core) over every page, for all three roles, in both light and dark themes, reports no violations.
 
 ## Run it locally
 

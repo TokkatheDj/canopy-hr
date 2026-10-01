@@ -21,6 +21,7 @@ export type Action =
   | "onboarding.manage"
   | "timeoff.approve"
   | "timesheets.approve"
+  | "coverage.manage"
   | "payroll.manage"
   | "benefits.manage"
   | "performance.manage"
@@ -46,6 +47,7 @@ const ADMIN_ONLY: Action[] = [
 const MANAGER_ALLOWED: Action[] = [
   "timeoff.approve",
   "timesheets.approve",
+  "coverage.manage",
   "reports.view",
   "people.viewCompensation", // for own team only — scope checked at query site
 ];

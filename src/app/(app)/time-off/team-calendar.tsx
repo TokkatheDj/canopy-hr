@@ -66,7 +66,7 @@ export function TeamCalendar({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold">{monthLabel}</h3>
+        <h2 className="font-semibold">{monthLabel}</h2>
         <div className="flex gap-1">
           <Button
             variant="outline"

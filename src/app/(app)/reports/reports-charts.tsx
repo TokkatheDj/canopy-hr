@@ -42,7 +42,9 @@ export function BarChartCard({
             <YAxis tickLine={false} axisLine={false} fontSize={11} allowDecimals={false} />
             <Tooltip
               cursor={{ fill: "rgba(16,185,129,0.08)" }}
-              contentStyle={{ fontSize: 12, borderRadius: 8 }}
+              contentStyle={{ fontSize: 12, borderRadius: 8, background: "var(--popover)", color: "var(--popover-foreground)", borderColor: "var(--border)" }}
+              itemStyle={{ color: "var(--popover-foreground)" }}
+              formatter={(v) => [v, title]}
             />
             <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} />
           </BarChart>
@@ -76,7 +78,11 @@ export function LineChartCard({
               fontSize={11}
               domain={["auto", "auto"]}
             />
-            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+            <Tooltip
+              contentStyle={{ fontSize: 12, borderRadius: 8, background: "var(--popover)", color: "var(--popover-foreground)", borderColor: "var(--border)" }}
+              itemStyle={{ color: "var(--popover-foreground)" }}
+              formatter={(v) => [v, title]}
+            />
             <Line
               type="monotone"
               dataKey="value"

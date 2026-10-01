@@ -4,6 +4,10 @@ import { Leaf, MapPin, Briefcase } from "lucide-react";
 
 export const metadata = { title: "Careers at Meridian Coffee Co." };
 
+// Openings change after deploy, so read them per request rather than
+// freezing the list into the build.
+export const dynamic = "force-dynamic";
+
 export default async function CareersPage() {
   const openings = await db.jobOpening.findMany({
     where: { isPublic: true, closedAt: null },

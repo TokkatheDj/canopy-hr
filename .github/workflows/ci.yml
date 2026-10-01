@@ -1,0 +1,24 @@
+name: CI
+
+# Lint, unit tests and a production build on every push and pull request.
+# Deploys stay manual (vercel.json turns git deploys off), so this only checks.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci          # postinstall runs prisma generate
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build   # no database needed; every data page renders per request

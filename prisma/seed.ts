@@ -463,6 +463,138 @@ async function main() {
   await seedPendingTimeOff(otherActive[5], vacation.id, "Vacation", daysFromNow(21), daysFromNow(25), 5);
   await seedPendingTimeOff(otherActive[6], sick.id, "Sick Leave", daysFromNow(3), daysFromNow(4), 2);
 
+  // ── shift coverage blasts (simulated email): one open today, one filled last week ──
+  async function seedCoverageBlast(opts: {
+    date: Date;
+    startTime: string;
+    endTime: string;
+    role: string;
+    locationId: string | null;
+    locationName: string | null;
+    createdBy: { id: string; firstName: string; lastName: string };
+    absent: { id: string; firstName: string; lastName: string } | null;
+    recipients: { emp: { id: string }; response: "AVAILABLE" | "DECLINED" | null }[];
+    filledById?: string;
+    createdAt: Date;
+  }) {
+    const dayLabel = opts.date.toLocaleDateString("en-US", {
+      weekday: "long", month: "long", day: "numeric",
+    });
+    const shortLabel = opts.date.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric",
+    });
+    const emailSubject = `Coverage needed: ${opts.role} shift on ${shortLabel} (${opts.startTime} - ${opts.endTime})`;
+    const emailBody = [
+      "Hi team,",
+      "",
+      `${opts.absent ? `${opts.absent.firstName} ${opts.absent.lastName} had to call off, and we` : "We"} need someone to cover the ${opts.role} shift on ${dayLabel} from ${opts.startTime} to ${opts.endTime}${opts.locationName ? ` at ${opts.locationName}` : ""}.`,
+      "",
+      'If you can pick it up, open the Coverage page in Canopy HR and tap "I can cover it". First to confirm gets the shift.',
+      "",
+      "Thank you!",
+      `${opts.createdBy.firstName} ${opts.createdBy.lastName}`,
+    ].join("\n");
+    const req = await db.coverageRequest.create({
+      data: {
+        date: opts.date,
+        startTime: opts.startTime,
+        endTime: opts.endTime,
+        locationId: opts.locationId,
+        role: opts.role,
+        status: opts.filledById ? "FILLED" : "OPEN",
+        emailSubject,
+        emailBody,
+        createdById: opts.createdBy.id,
+        absentId: opts.absent?.id ?? null,
+        filledById: opts.filledById ?? null,
+        createdAt: opts.createdAt,
+        recipients: {
+          createMany: {
+            data: opts.recipients.map((r) => ({
+              employeeId: r.emp.id,
+              sentAt: opts.createdAt,
+              response: r.response,
+              respondedAt: r.response
+                ? new Date(opts.createdAt.getTime() + 45 * 60 * 1000)
+                : null,
+            })),
+          },
+        },
+      },
+    });
+    if (!opts.filledById) {
+      const recUsers = await db.user.findMany({
+        where: { employeeId: { in: opts.recipients.map((r) => r.emp.id) } },
+        select: { id: true },
+      });
+      if (recUsers.length > 0) {
+        await db.notification.createMany({
+          data: recUsers.map((u) => ({
+            userId: u.id,
+            title: "Can you cover a shift?",
+            body: emailSubject,
+            href: "/coverage",
+            createdAt: opts.createdAt,
+          })),
+        });
+      }
+    }
+    return req;
+  }
+
+  const openBlast = await seedCoverageBlast({
+    date: daysFromNow(0),
+    startTime: "6:00 AM",
+    endTime: "2:30 PM",
+    role: "Barista",
+    locationId: hq.id,
+    locationName: "Portland HQ",
+    createdBy: mgrDemo,
+    absent: otherActive[1], // out sick today (seeded above)
+    recipients: [
+      { emp: empDemo, response: null }, // demo Employee responds live
+      { emp: jordanReports[1], response: "AVAILABLE" },
+      { emp: jordanReports[2], response: null },
+      { emp: otherActive[3], response: "DECLINED" },
+      { emp: otherActive[5], response: null },
+      { emp: otherActive[6], response: null },
+      { emp: otherActive[7], response: null },
+    ],
+    createdAt: new Date(NOW.getTime() - 2 * 60 * 60 * 1000),
+  });
+  await seedCoverageBlast({
+    date: daysFromNow(-6),
+    startTime: "5:00 PM",
+    endTime: "11:00 PM",
+    role: "Closing Crew",
+    locationId: roastery.id,
+    locationName: "Austin Roastery",
+    createdBy: adminEmp,
+    absent: jordanReports[2],
+    recipients: [
+      { emp: otherActive[5], response: "AVAILABLE" },
+      { emp: otherActive[6], response: "DECLINED" },
+      { emp: jordanReports[0], response: null },
+      { emp: otherActive[7], response: "AVAILABLE" },
+    ],
+    filledById: otherActive[5].id,
+    createdAt: daysFromNow(-7),
+  });
+  // demo Manager sees the "someone replied" notification
+  const mgrUserForCoverage = await db.user.findUnique({
+    where: { employeeId: mgrDemo.id },
+  });
+  if (mgrUserForCoverage) {
+    await db.notification.create({
+      data: {
+        userId: mgrUserForCoverage.id,
+        title: `${jordanReports[1].firstName} ${jordanReports[1].lastName} can cover the shift`,
+        body: openBlast.emailSubject,
+        href: "/coverage",
+      },
+    });
+  }
+
   // guarantee dashboard celebrations: two birthdays this week, one anniversary this month
   const bday1 = new Date(NOW); bday1.setFullYear(YEAR - 31); bday1.setDate(bday1.getDate() + 1);
   const bday2 = new Date(NOW); bday2.setFullYear(YEAR - 27); bday2.setDate(bday2.getDate() + 4);

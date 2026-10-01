@@ -50,7 +50,7 @@ export default async function PayStubPage({
           {/* Header */}
           <div className="flex items-start justify-between border-b pb-4">
             <div>
-              <div className="flex items-center gap-1.5 text-lg font-bold text-emerald-700">
+              <div className="flex items-center gap-1.5 text-lg font-bold text-emerald-700 dark:text-emerald-400">
                 <Leaf className="size-5" /> {settings?.companyName ?? "Canopy HR"}
               </div>
               <p className="text-xs text-muted-foreground">{settings?.address}</p>

@@ -28,9 +28,11 @@ import { toggleTask, startOffboarding } from "@/actions/onboarding";
 
 export function TaskCheckbox({
   taskId,
+  label,
   checked,
 }: {
   taskId: string;
+  label: string;
   checked: boolean;
 }) {
   const router = useRouter();
@@ -39,6 +41,7 @@ export function TaskCheckbox({
   return (
     <Checkbox
       checked={checked}
+      aria-label={label}
       disabled={busy}
       className="mt-0.5"
       onCheckedChange={async () => {

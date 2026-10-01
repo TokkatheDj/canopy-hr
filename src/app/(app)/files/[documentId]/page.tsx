@@ -89,7 +89,7 @@ export default async function DocumentPage({
           ) : doc.blobUrl ? (
             <a
               href={doc.blobUrl}
-              className="text-emerald-700 underline"
+              className="text-emerald-700 underline dark:text-emerald-400"
               target="_blank"
             >
               Download file
