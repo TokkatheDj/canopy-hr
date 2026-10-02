@@ -73,7 +73,7 @@ export default async function MyInfoPage() {
                   className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
                 >
                   <span>{p.summary}</span>
-                  <Badge variant="outline" className="text-amber-700">
+                  <Badge variant="outline" className="text-amber-700 dark:text-amber-400">
                     waiting on {waitingOn?.approverName ?? "approval"}
                   </Badge>
                 </div>
