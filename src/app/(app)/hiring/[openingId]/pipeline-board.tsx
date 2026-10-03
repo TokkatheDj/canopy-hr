@@ -65,14 +65,17 @@ function CandidateItem({
 }
 
 function DraggableCandidate({ candidate }: { candidate: CandidateCard }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const { listeners, setNodeRef, isDragging } = useDraggable({
     id: candidate.id,
     disabled: candidate.hired,
   });
+  // Dragging is pointer-only (no KeyboardSensor), so dnd-kit's `attributes` - role="button",
+  // tabIndex and "press space to pick up" instructions - would add a dead focus stop wrapped
+  // around the name link (axe: nested-interactive). Keyboard users move a candidate with the
+  // Stage select on the candidate's own page, which the name links to.
   return (
     <div
       ref={setNodeRef}
-      {...attributes}
       {...listeners}
       className={cn("touch-none", isDragging && "opacity-40", !candidate.hired && "cursor-grab")}
     >

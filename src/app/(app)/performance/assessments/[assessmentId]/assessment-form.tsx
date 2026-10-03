@@ -57,16 +57,19 @@ export function AssessmentForm({
       {questions.map((q) => (
         <Card key={q.id}>
           <CardContent className="space-y-2 py-4">
-            <Label className="text-sm font-medium">{q.prompt}</Label>
+            <Label id={`q-${q.id}-label`} htmlFor={`q-${q.id}`} className="text-sm font-medium">
+              {q.prompt}
+            </Label>
             {q.type === "text" ? (
               <Textarea
+                id={`q-${q.id}`}
                 value={String(answers[q.id] ?? "")}
                 disabled={readOnly}
                 onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
                 className="min-h-[100px]"
               />
             ) : (
-              <div className="flex gap-1">
+              <div role="group" aria-labelledby={`q-${q.id}-label`} className="flex gap-1">
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button
                     key={n}

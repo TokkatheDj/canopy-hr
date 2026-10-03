@@ -120,7 +120,7 @@ export default async function DocumentPage({
                     </span>
                   </span>
                 ) : (
-                  <Badge variant="outline" className="text-amber-600">
+                  <Badge variant="outline" className="text-amber-700 dark:text-amber-400">
                     {s.status.toLowerCase()}
                   </Badge>
                 )}
