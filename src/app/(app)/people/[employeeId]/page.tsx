@@ -142,7 +142,7 @@ export default async function EmployeeProfilePage({
                 {" · Reports to "}
                 <Link
                   href={`/people/${emp.manager.id}`}
-                  className="text-emerald-700 hover:underline dark:text-emerald-400"
+                  className="text-emerald-700 underline underline-offset-2 dark:text-emerald-400"
                 >
                   {emp.manager.firstName} {emp.manager.lastName}
                 </Link>
@@ -223,9 +223,11 @@ export default async function EmployeeProfilePage({
                     </div>
                   </>
                 ) : (
-                  <div className="sm:col-span-2 text-muted-foreground">
-                    Personal contact details are visible to {emp.firstName}, their
-                    manager, and HR.
+                  <div className="sm:col-span-2">
+                    <dt className="text-muted-foreground">Personal details</dt>
+                    <dd className="text-muted-foreground">
+                      Visible to {emp.firstName}, their manager, and HR.
+                    </dd>
                   </div>
                 )}
               </dl>

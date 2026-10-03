@@ -436,7 +436,8 @@ export function CustomFieldsEditor({
     <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-2 text-sm">
       {fields.map((f) => (
         <div key={f.id}>
-          <dt className="text-muted-foreground">{f.label}</dt>
+          {/* The dt is each control's visible label: aria-labelledby ties them together. */}
+          <dt id={`cf-${f.id}`} className="text-muted-foreground">{f.label}</dt>
           <dd className="mt-0.5">
             {!canEdit ? (
               f.type === "CHECKBOX" ? (f.value === "true" ? "Yes" : "No") : f.value || "—"
@@ -447,7 +448,7 @@ export function CustomFieldsEditor({
                   v && submit(() => setCustomFieldValue(employeeId, f.id, v))
                 }
               >
-                <SelectTrigger className="h-8 w-48">
+                <SelectTrigger className="h-8 w-48" aria-labelledby={`cf-${f.id}`}>
                   <SelectValue placeholder="—" />
                 </SelectTrigger>
                 <SelectContent>
@@ -460,6 +461,7 @@ export function CustomFieldsEditor({
               </Select>
             ) : f.type === "CHECKBOX" ? (
               <Checkbox
+                aria-labelledby={`cf-${f.id}`}
                 checked={f.value === "true"}
                 onCheckedChange={(checked) =>
                   submit(() =>
@@ -469,6 +471,7 @@ export function CustomFieldsEditor({
               />
             ) : (
               <Input
+                aria-labelledby={`cf-${f.id}`}
                 defaultValue={f.value}
                 type={f.type === "NUMBER" ? "number" : f.type === "DATE" ? "date" : "text"}
                 className="h-8 w-48"

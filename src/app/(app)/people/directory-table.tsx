@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/data-table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -55,7 +56,15 @@ const columns: ColumnDef<DirectoryRow>[] = [
           </AvatarFallback>
         </Avatar>
         <div>
-          <div className="font-medium">{row.original.name}</div>
+          {/* A real link: the row's click handler is mouse-only, so without this a
+              keyboard or screen-reader user could not open anyone's profile. */}
+          <Link
+            href={`/people/${row.original.id}`}
+            className="font-medium hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {row.original.name}
+          </Link>
           <div className="text-xs text-muted-foreground">
             {row.original.workEmail}
           </div>
