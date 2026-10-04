@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { currentUser } from "@/lib/auth";
-import { splitOvertime } from "@/lib/timesheets/overtime";
+import { periodOvertime } from "@/lib/timesheets/period-overtime";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -64,7 +64,10 @@ export default async function TimesheetDetailPage({
 
   const totalHours =
     Math.round(period.entries.reduce((a, e) => a + e.hours, 0) * 100) / 100;
-  const split = splitOvertime(
+  const split = await periodOvertime(
+    period.employeeId,
+    period.periodStart,
+    period.periodEnd,
     period.entries.map((e) => ({ date: e.date, hours: e.hours })),
   );
   const fmtRange = (s: Date, e: Date) =>

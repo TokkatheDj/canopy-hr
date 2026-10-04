@@ -34,6 +34,8 @@ export type StubLines = {
   grossCents: number;
   preTaxDeductionCents: number;
   taxableCents: number;
+  /** Social Security / Medicare wages: gross less health benefits, NOT less 401(k). */
+  ficaTaxableCents: number;
   taxCents: number;
   netCents: number;
 };
@@ -100,12 +102,18 @@ export function computeStub(input: PayInput): StubLines {
   const preTaxDeductionCents = deductions
     .filter((d) => d.preTax)
     .reduce((a, d) => a + d.amountCents, 0);
+  // Two wage bases, as in US payroll: health benefits (section 125) come off before every tax,
+  // but 401(k) deferrals only reduce income-tax wages - Social Security and Medicare are still
+  // owed on them. Until Oct 2026 the 401(k) reduced FICA too, under-withholding it.
+  const benefitCents = (input.benefitDeductions ?? []).reduce((a, b) => a + b.amountCents, 0);
   const taxableCents = Math.max(0, grossCents - preTaxDeductionCents);
+  const ficaTaxableCents = Math.max(0, grossCents - benefitCents);
+  const FICA = new Set<string>(["Social Security", "Medicare"]);
 
   const taxes: TaxLine[] = TAX_RATES.map((t) => ({
     label: t.label,
     rate: t.rate,
-    amountCents: r(taxableCents * t.rate),
+    amountCents: r((FICA.has(t.label) ? ficaTaxableCents : taxableCents) * t.rate),
   }));
   const taxCents = taxes.reduce((a, t) => a + t.amountCents, 0);
 
@@ -122,6 +130,7 @@ export function computeStub(input: PayInput): StubLines {
     grossCents,
     preTaxDeductionCents,
     taxableCents,
+    ficaTaxableCents,
     taxCents,
     netCents,
   };
