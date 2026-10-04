@@ -86,13 +86,12 @@ Choices that were right for a demo but would change for real customers:
 
 Next, in order:
 
-1. **Browser tests in CI.** The engine logic has unit tests; the flows (request time off → manager approves → balance drops) are verified by hand and with ad-hoc Playwright runs. Those runs belong in CI against a throwaway database.
-2. **Real email delivery** for coverage blasts and approvals, behind a feature flag so the demo keeps working with fictional addresses.
-3. **Real withholding tables** in place of the illustrative flat tax rates — the gross-to-net engine is already isolated in one module, so this is a data change more than a code change.
-4. **The rest of the parity backlog:** company branding (logo and colours), candidate ratings and a talent pool, configurable hiring statuses and approval chains, pay grades and bands, and scheduled eNPS surveys.
-5. **Major upgrades held back on purpose:** TanStack Table 9, ESLint 10, TypeScript 7 and Prisma 8 each change enough to deserve their own pass.
+1. **Real email delivery** for coverage blasts and approvals, behind a feature flag so the demo keeps working with fictional addresses.
+2. **Real withholding tables** in place of the illustrative flat tax rates — the gross-to-net engine is already isolated in one module, so this is a data change more than a code change.
+3. **The rest of the parity backlog:** company branding (logo and colours), candidate ratings and a talent pool, configurable hiring statuses and approval chains, pay grades and bands, and scheduled eNPS surveys.
+4. **Major upgrades held back on purpose:** TanStack Table 9, ESLint 10, TypeScript 7 and Prisma 8 each change enough to deserve their own pass.
 
-**Quality checks:** every push runs lint, the unit tests and a production build (see the badge above). An automated accessibility scan (axe-core) over every page, for all three roles, in both light and dark themes, reports no violations.
+**Quality checks:** every push runs lint, the unit tests and a production build, plus browser tests of the real flows against a throwaway database seeded with the demo company: every role signs in; a time-off request goes through the whole approval chain and the balance drops by exactly the hours taken; nobody, not even the admin, is offered their own request (see the badge above). An automated accessibility scan (axe-core) over every page, for all three roles, in both light and dark themes, reports no violations.
 
 ## Run it locally
 
