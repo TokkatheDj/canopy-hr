@@ -33,6 +33,29 @@ describe("computeStub — salary", () => {
     expect(k401?.amountCents).toBe(20_000);
     expect(stub.taxableCents).toBe(380_000);
   });
+
+  // US payroll: 401(k) deferrals reduce income-tax wages but NOT Social Security / Medicare
+  // wages; section-125 health benefits reduce both.
+  it("401(k) does not reduce Social Security or Medicare", () => {
+    const stub = computeStub({ payType: "SALARY", amountCents: 9_600_000, retirementPct: 5 });
+    const tax = (l: string) => stub.taxes.find((t) => t.label === l)?.amountCents;
+    expect(tax("Federal Income Tax")).toBe(45_600); // 12% of 3,800.00
+    expect(tax("Social Security")).toBe(24_800); // 6.2% of 4,000.00 - not 3,800.00
+    expect(tax("Medicare")).toBe(5_800); // 1.45% of 4,000.00
+  });
+
+  it("health benefits reduce both income-tax and FICA wages", () => {
+    const stub = computeStub({
+      payType: "SALARY",
+      amountCents: 9_600_000,
+      retirementPct: 5,
+      benefitDeductions: [{ label: "Medical", amountCents: 10_000 }],
+    });
+    const tax = (l: string) => stub.taxes.find((t) => t.label === l)?.amountCents;
+    expect(stub.taxableCents).toBe(370_000); // income tax: 4,000 - 100 - 200
+    expect(stub.ficaTaxableCents).toBe(390_000); // FICA: 4,000 - 100
+    expect(tax("Social Security")).toBe(24_180); // 6.2% of 3,900.00
+  });
 });
 
 describe("computeStub — hourly", () => {

@@ -13,17 +13,37 @@ function weekKey(d: Date): string {
   return sunday.toISOString().slice(0, 10);
 }
 
-export function splitOvertime(entries: DayHours[], weeklyThreshold = 40): OvertimeSplit {
-  const weeks = new Map<string, number>();
-  for (const e of entries) {
-    const key = weekKey(e.date);
-    weeks.set(key, (weeks.get(key) ?? 0) + e.hours);
-  }
+/** The Sunday that starts `d`'s workweek - load entries from here when a period starts mid-week. */
+export function workweekStart(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - d.getUTCDay()));
+}
+
+/**
+ * Split hours into regular and overtime.
+ *
+ * Each workweek is walked day by day, and hours become overtime on the day the week's running
+ * total passes the threshold. With `period`, only days inside it are counted - but the earlier
+ * days of a workweek that started before the period must be passed in too, so the running total
+ * is right. Pay periods are semi-monthly and a workweek often straddles the 15th or month-end:
+ * counting each period's days on their own, a 50-hour week split 25/25 paid no overtime at all.
+ */
+export function splitOvertime(
+  entries: DayHours[],
+  weeklyThreshold = 40,
+  period?: { from: Date; to: Date },
+): OvertimeSplit {
+  const sorted = [...entries].sort((a, b) => a.date.getTime() - b.date.getTime());
+  const weekSoFar = new Map<string, number>();
   let regular = 0;
   let overtime = 0;
-  for (const total of weeks.values()) {
-    regular += Math.min(total, weeklyThreshold);
-    overtime += Math.max(0, total - weeklyThreshold);
+  for (const e of sorted) {
+    const key = weekKey(e.date);
+    const before = weekSoFar.get(key) ?? 0;
+    weekSoFar.set(key, before + e.hours);
+    const reg = Math.max(0, Math.min(e.hours, weeklyThreshold - before));
+    if (period && (e.date < period.from || e.date > period.to)) continue;
+    regular += reg;
+    overtime += e.hours - reg;
   }
   return {
     regularHours: Math.round(regular * 100) / 100,

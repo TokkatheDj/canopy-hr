@@ -58,7 +58,7 @@ feature-by-feature comparison against the two platforms it's modeled on.
 
 ## What's simulated — and why
 
-This is a demo, so anything that would touch the real world is simulated deliberately: payroll taxes use illustrative flat rates (12% federal, 5% state, 6.2% Social Security, 1.45% Medicare) rather than real withholding tables; no money moves; e-signatures are typed-name capture; and notifications are in-app rather than email — coverage-blast "emails" are composed and recorded for real (you can read them in the app) but delivered as in-app notifications, since the demo employees' addresses are fictional. Everything else — accrual math, overtime splitting, gross-to-net computation, approval chains — is real, running logic with unit tests.
+This is a demo, so anything that would touch the real world is simulated deliberately: payroll taxes use illustrative flat rates (12% federal, 5% state, 6.2% Social Security, 1.45% Medicare) rather than real withholding tables — applied to the right wage bases, though: health benefits reduce every tax, a 401(k) only income tax, and overtime is counted per Sunday–Saturday workweek even when a week straddles two semi-monthly pay periods; no money moves; e-signatures are typed-name capture; and notifications are in-app rather than email — coverage-blast "emails" are composed and recorded for real (you can read them in the app) but delivered as in-app notifications, since the demo employees' addresses are fictional. Everything else — accrual math, overtime splitting, gross-to-net computation, approval chains — is real, running logic with unit tests.
 
 ## Architecture notes
 

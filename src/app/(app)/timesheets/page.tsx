@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { currentUser } from "@/lib/auth";
 import { payPeriodFor } from "@/lib/payroll/engine";
-import { splitOvertime } from "@/lib/timesheets/overtime";
+import { periodOvertime } from "@/lib/timesheets/period-overtime";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -67,7 +67,10 @@ export default async function TimesheetsPage() {
   const entries = period?.entries ?? [];
   const openEntry = entries.find((e) => e.clockIn && !e.clockOut);
   const totalHours = Math.round(entries.reduce((a, e) => a + e.hours, 0) * 100) / 100;
-  const split = splitOvertime(entries.map((e) => ({ date: e.date, hours: e.hours })));
+  const split = period
+    ? await periodOvertime(user.employeeId, period.periodStart, period.periodEnd,
+        entries.map((e) => ({ date: e.date, hours: e.hours })))
+    : { regularHours: 0, overtimeHours: 0 };
 
   const fmtRange = (s: Date, e: Date) =>
     `${s.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })} – ${e.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`;

@@ -7,7 +7,7 @@ import { require_ } from "@/lib/authz";
 import { audit } from "@/lib/audit";
 import { currentAsOf } from "@/lib/history";
 import { computeStub, payPeriodFor } from "@/lib/payroll/engine";
-import { splitOvertime } from "@/lib/timesheets/overtime";
+import { splitOvertime, workweekStart } from "@/lib/timesheets/overtime";
 import type { ActionResult } from "@/actions/people";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -61,7 +61,9 @@ export async function createDraftRun(): Promise<ActionResult & { runId?: string 
         compensations: true,
         enrollments: { include: { plan: true } },
         timesheetPeriods: {
-          where: { periodStart: period.start, status: "APPROVED" },
+          // This period plus the earlier days of a workweek that started before it, so overtime
+          // is counted per workweek, not per pay period (see splitOvertime).
+          where: { status: "APPROVED", periodStart: { lte: period.end }, periodEnd: { gte: workweekStart(period.start) } },
           include: { entries: true },
         },
       },
@@ -88,7 +90,11 @@ export async function createDraftRun(): Promise<ActionResult & { runId?: string 
         const entries = emp.timesheetPeriods.flatMap((p) =>
           p.entries.map((e) => ({ date: e.date, hours: e.hours })),
         );
-        const split = splitOvertime(entries);
+        const split = splitOvertime(
+          entries.filter((e) => e.date >= workweekStart(period.start) && e.date <= period.end),
+          40,
+          { from: period.start, to: period.end },
+        );
         regularHours = split.regularHours;
         overtimeHours = split.overtimeHours;
       }
