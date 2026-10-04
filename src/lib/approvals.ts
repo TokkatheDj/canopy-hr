@@ -134,6 +134,12 @@ export async function actOnApproval(
     where: { id: approvalId },
   });
   if (approval.status !== "PENDING") throw new Error("Request already resolved");
+  // Nobody decides their own request - not even an admin. buildApproverChain never assigns
+  // you your own step, but the admin override below could act on ANY step, so an admin with a
+  // manager (the demo admin reports to the CEO) could request time off and approve it herself.
+  if (approval.requesterId && approval.requesterId === actor.employeeId) {
+    throw new Error("You can't decide your own request");
+  }
 
   const steps = approval.steps as unknown as ApprovalStep[];
   const idx = steps.findIndex((s) => s.status === "PENDING");

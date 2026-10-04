@@ -37,6 +37,7 @@ export default async function InboxPage() {
     const steps = a.steps as unknown as ApprovalStep[];
     const current = steps.find((s) => s.status === "PENDING");
     if (!current) return false;
+    if (a.requesterId === user.employeeId) return false; // never your own request
     return user.role === "ADMIN" || current.approverId === user.employeeId;
   });
 
