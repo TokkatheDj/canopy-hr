@@ -50,3 +50,7 @@ next-env.d.ts
 # Scoped to worktrees ONLY: .claude/skills/ is deliberately committed
 # (the Prisma skill set), so a blanket .claude/ rule would be wrong.
 /.claude/worktrees/
+
+# Playwright
+/test-results/
+/playwright-report/
