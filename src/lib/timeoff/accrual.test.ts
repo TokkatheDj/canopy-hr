@@ -5,6 +5,8 @@ import {
   businessDays,
   sumLedger,
   carryoverAdjustment,
+  carryoverYears,
+  accrualUntil,
 } from "./accrual";
 
 const d = (s: string) => new Date(s + "T00:00:00Z");
@@ -90,5 +92,29 @@ describe("carryoverAdjustment", () => {
   });
   it("under the cap is untouched", () => {
     expect(carryoverAdjustment(24, 40)).toBe(0);
+  });
+});
+
+describe("carryoverYears", () => {
+  const first = d("2026-12-31");
+  it("applies the cap at each year-end crossed, from the first one on", () => {
+    expect(carryoverYears(d("2026-06-01"), d("2028-02-01"), first)).toEqual([2026, 2027]);
+  });
+  it("never applies it retroactively, before the first year-end", () => {
+    expect(carryoverYears(d("2025-01-01"), d("2026-10-04"), first)).toEqual([]);
+    expect(carryoverYears(d("2025-01-01"), d("2027-01-02"), first)).toEqual([2026]);
+  });
+  it("waits for Jan 1 - Dec 31 itself is not yet past", () => {
+    expect(carryoverYears(d("2026-06-01"), d("2026-12-31"), first)).toEqual([]);
+  });
+});
+
+describe("accrualUntil", () => {
+  it("stops at the employee's end date", () => {
+    expect(accrualUntil(d("2026-10-04"), d("2026-03-31"))).toEqual(d("2026-03-31"));
+  });
+  it("is now for a current employee", () => {
+    expect(accrualUntil(d("2026-10-04"), null)).toEqual(d("2026-10-04"));
+    expect(accrualUntil(d("2026-10-04"), d("2027-01-01"))).toEqual(d("2026-10-04"));
   });
 });

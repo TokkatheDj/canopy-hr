@@ -71,6 +71,27 @@ export function sumLedger(entries: Array<{ amountHours: number }>): number {
  * is forfeited via a negative ADJUSTMENT dated Jan 1. Returns the adjustment
  * amount (negative) or 0 when no forfeiture applies.
  */
+/**
+ * Year-ends whose carryover cap should be applied: every Dec 31 in [from, to) on or after
+ * `firstYearEnd` (caps were never applied before Oct 2026; applying them retroactively would cut
+ * balances people had already spent from, so they start from the next year-end). Returns the
+ * year that ENDED (the forfeiture is dated Jan 1 of the following year).
+ */
+export function carryoverYears(from: Date, to: Date, firstYearEnd: Date): number[] {
+  const out: number[] = [];
+  for (let y = from.getUTCFullYear(); y <= to.getUTCFullYear(); y++) {
+    const yearEnd = new Date(Date.UTC(y, 11, 31));
+    const jan1 = new Date(Date.UTC(y + 1, 0, 1));
+    if (yearEnd >= firstYearEnd && yearEnd >= from && jan1 <= to) out.push(y);
+  }
+  return out;
+}
+
+/** Accruals stop at the employee's last day: the earlier of now and their end date. */
+export function accrualUntil(now: Date, endDate: Date | null | undefined): Date {
+  return endDate && endDate < now ? endDate : now;
+}
+
 export function carryoverAdjustment(balanceAtYearEnd: number, capHours: number | null): number {
   if (capHours == null) return 0;
   if (balanceAtYearEnd <= capHours) return 0;
