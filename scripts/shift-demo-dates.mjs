@@ -72,6 +72,7 @@ function shiftText(text, n, ref) {
 
 const SKIP_TABLES = new Set(["_prisma_migrations"]);
 const SKIP_COLUMNS = new Set(["Holiday.date"]);
+const PARK_DAYS = 36525;   // 100 years: far outside any demo date (see the two-hop update below)
 const isEvent = (col) => /At$/.test(col) || col === "clockIn" || col === "clockOut";
 
 const client = new pg.Client({ connectionString: url });
@@ -104,8 +105,15 @@ try {
   for (const { table_name: t, column_name: c, data_type: type } of cols) {
     if (SKIP_TABLES.has(t) || SKIP_COLUMNS.has(`${t}.${c}`)) continue;
     columns++;
+    // TWO HOPS, never one (25 Nov 2026). A unique index is checked row by row, so a plain
+    // "+ N days" fails whenever N equals the gap between two rows: +28 put the pay period
+    // starting Feb 1 onto Mar 1 before Mar 1 had moved ("duplicate key ...
+    // PayrollRun_scheduleId_periodStart_key"; 56 and 21 never matched a gap). Parking every
+    // row a century away first means a moving row can never meet one that has not moved.
     const r = await client.query(
-      `update "${t}" set "${c}" = "${c}" + make_interval(days => $1) where "${c}" is not null`, [days]);
+      `update "${t}" set "${c}" = "${c}" + make_interval(days => $1) where "${c}" is not null`, [days + PARK_DAYS]);
+    await client.query(
+      `update "${t}" set "${c}" = "${c}" - make_interval(days => $1) where "${c}" is not null`, [PARK_DAYS]);
     moved += r.rowCount;
     if (isEvent(c)) {
       // Prisma stores DateTime as timestamp(3) WITHOUT time zone, in UTC. now() has
